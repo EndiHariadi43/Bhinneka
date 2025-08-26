@@ -102,10 +102,7 @@ async def upsert_user(msg: Message, ref_by: int | None = None):
 async def set_premium(user_id: int, days: int):
     until = int((datetime.now(timezone.utc) + timedelta(days=days)).timestamp())
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE users SET premium_until=? WHERE user_id=?",
-            (until, user_id),
-        )
+        await db.execute("UPDATE users SET premium_until=? WHERE user_id=?", (until, user_id))
         await db.commit()
 
 async def get_status(user_id: int):
@@ -164,7 +161,7 @@ async def premium_watcher():
     await asyncio.sleep(3)
     while True:
         try:
-            # Tandai order PENDING yang kadaluarsa (>24 jam) sebagai EXPIRED
+            # tandai order expired (>24h)
             now_ts = int(time.time())
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute(
@@ -184,7 +181,6 @@ async def premium_watcher():
 
             tx_data = await ton_get_transactions(TON_DEST, limit=40)
             txs = tx_data.get("result", []) if isinstance(tx_data, dict) else []
-
             if not txs:
                 await asyncio.sleep(12)
                 continue
@@ -238,6 +234,8 @@ def premium_keyboard(deeplink: str) -> InlineKeyboardMarkup:
 # ---------- Handlers ----------
 @dp.message(CommandStart())
 async def cmd_start(msg: Message):
+    logger.info("START from uid=%s username=%s", msg.from_user.id, msg.from_user.username)
+
     ref_by = None
     if msg.text and " " in msg.text:
         try:
@@ -245,8 +243,12 @@ async def cmd_start(msg: Message):
         except Exception:
             ref_by = None
 
-    await upsert_user(msg, ref_by)
-    await msg.answer(WELCOME_TEXT)
+    try:
+        await upsert_user(msg, ref_by)
+        await msg.answer(WELCOME_TEXT)
+        logger.info("START replied to uid=%s", msg.from_user.id)
+    except Exception as e:
+        logger.exception("START failed: %s", e)
 
 @dp.message(Command("tasks"))
 async def cmd_tasks(msg: Message):
@@ -266,7 +268,7 @@ async def cmd_premium(msg: Message):
     code = f"BHEK-{uid}-{secrets.token_hex(2).upper()}"
 
     async with aiosqlite.connect(DB_PATH) as db:
-        # Hindari penumpukan order pending user yang sama
+        # hindari penumpukan order pending
         await db.execute("DELETE FROM orders WHERE user_id=? AND status='PENDING'", (uid,))
         await db.execute(
             "INSERT INTO orders(user_id, code, amount_ton, created_at) VALUES (?,?,?,?)",
@@ -320,19 +322,20 @@ async def cmd_status(msg: Message):
 @dp.message(Command("help"))
 async def cmd_help(msg: Message):
     await msg.answer(
-        "Perintah:\n"
-        "/start — welcome + menu\n"
-        "/tasks — quest harian\n"
-        "/claim — klaim quest (demo)\n"
-        "/premium — beli Premium via TON\n"
-        "/status — cek status Premium"
+        "📖 <b>Command List</b>\n\n"
+        "/start — Welcome & menu\n"
+        "/tasks — Quest harian\n"
+        "/claim — Klaim quest (demo)\n"
+        "/premium — Beli Premium via TON\n"
+        "/status — Cek status Premium\n"
+        "/help — Panduan semua command"
     )
 
 # ---------- Main ----------
 async def main():
     await init_db()
 
-    # tampilkan menu commands ketika user menekan '/'
+    # set menu commands
     await bot.set_my_commands([
         BotCommand(command="start", description="Welcome + menu"),
         BotCommand(command="tasks", description="Quest harian"),
@@ -343,7 +346,7 @@ async def main():
     ])
 
     asyncio.create_task(premium_watcher())
-    logger.info("BhinnekaBot running...")
+    logger.info("🚀 BhinnekaBot is polling for updates...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
