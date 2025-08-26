@@ -56,7 +56,6 @@ jobs:
           timeout 5h45m python -u bhinnekabot.py || true
 
       # Pastikan DB ada supaya upload sukses di run pertama.
-      # Pakai sqlite3 standar (tidak tergantung aiosqlite).
       - name: Ensure DB file exists (first run safety)
         shell: bash
         run: |
