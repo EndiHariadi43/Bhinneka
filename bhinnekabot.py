@@ -222,4 +222,132 @@ async def premium_watcher():
         except httpx.HTTPError as e:
             logger.warning("TON API error: %s", e)
         except Exception as e:
-            logger.exception("watcher error: %s
+            logger.exception("watcher error: %s", e)
+
+        await asyncio.sleep(15)
+
+# ---------- UI Builders ----------
+def premium_keyboard(deeplink: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=deeplink)],
+            [InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")],
+        ]
+    )
+
+# ---------- Handlers ----------
+@dp.message(CommandStart())
+async def cmd_start(msg: Message):
+    ref_by = None
+    if msg.text and " " in msg.text:
+        try:
+            ref_by = int(msg.text.split(" ", 1)[1].strip())
+        except Exception:
+            ref_by = None
+
+    await upsert_user(msg, ref_by)
+    await msg.answer(WELCOME_TEXT)
+
+@dp.message(Command("tasks"))
+async def cmd_tasks(msg: Message):
+    lines = [f"📋 <b>Quest Harian</b>"]
+    for i, t in enumerate(TASKS, 1):
+        lines.append(f"{i}. {t}")
+    lines.append("\nKetik <code>/claim</code> setelah selesai.")
+    await msg.answer("\n".join(lines))
+
+@dp.message(Command("claim"))
+async def cmd_claim(msg: Message):
+    await msg.answer("✅ Klaim kamu dicatat. (Sistem reward akan diaktifkan setelah Premium)")
+
+@dp.message(Command("premium"))
+async def cmd_premium(msg: Message):
+    uid = msg.from_user.id
+    code = f"BHEK-{uid}-{secrets.token_hex(2).upper()}"
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Hindari penumpukan order pending user yang sama
+        await db.execute("DELETE FROM orders WHERE user_id=? AND status='PENDING'", (uid,))
+        await db.execute(
+            "INSERT INTO orders(user_id, code, amount_ton, created_at) VALUES (?,?,?,?)",
+            (uid, code, PREMIUM_PRICE_TON, int(time.time())),
+        )
+        await db.commit()
+
+    logger.info("Order created uid=%s code=%s price=%.3f", uid, code, PREMIUM_PRICE_TON)
+
+    link = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
+    text = (
+        "🌟 <b>Premium / Posisi Istimewa</b>\n\n"
+        f"Harga: <b>{PREMIUM_PRICE_TON} TON</b> untuk {PREMIUM_DAYS} hari.\n"
+        f"Alamat: <code>{TON_DEST}</code>\n"
+        f"Komentar (WAJIB): <code>{code}</code>\n\n"
+        "1) Klik tombol <b>Pay in TON</b> (atau transfer manual)\n"
+        "2) Pastikan <b>comment</b> PERSIS sama\n"
+        "3) Setelah bayar, tekan <b>Saya sudah transfer</b>\n\n"
+        "Bot memverifikasi di blockchain dan otomatis mengaktifkan status Premium ✅"
+    )
+    await msg.answer(text, reply_markup=premium_keyboard(link))
+
+@dp.callback_query(F.data == "check_payment")
+async def cb_check_payment(cb):
+    uid = cb.from_user.id
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT code, amount_ton, status FROM orders WHERE user_id=? ORDER BY id DESC LIMIT 5",
+            (uid,),
+        )
+        rows = await cur.fetchall()
+
+    status = await get_status(uid)
+    if not rows:
+        await cb.message.answer(status + "\n\nTidak ada pembayaran yang tertunda.")
+        await cb.answer()
+        return
+
+    lines = [status, "", "🧾 <b>Riwayat Pembayaran</b> (terakhir):"]
+    for code, amt, st in rows:
+        lines.append(f"• {st}: {amt} TON | comment: <code>{code}</code>")
+    lines.append("\n⏳ Jika baru transfer, tunggu 1–2 menit lalu klik lagi.")
+    await cb.message.answer("\n".join(lines))
+    await cb.answer()
+
+@dp.message(Command("status"))
+async def cmd_status(msg: Message):
+    s = await get_status(msg.from_user.id)
+    await msg.answer(s)
+
+@dp.message(Command("help"))
+async def cmd_help(msg: Message):
+    await msg.answer(
+        "Perintah:\n"
+        "/start — welcome + menu\n"
+        "/tasks — quest harian\n"
+        "/claim — klaim quest (demo)\n"
+        "/premium — beli Premium via TON\n"
+        "/status — cek status Premium"
+    )
+
+# ---------- Main ----------
+async def main():
+    await init_db()
+
+    # tampilkan menu commands ketika user menekan '/'
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Welcome + menu"),
+        BotCommand(command="tasks", description="Quest harian"),
+        BotCommand(command="claim", description="Klaim quest (demo)"),
+        BotCommand(command="premium", description="Beli Premium via TON"),
+        BotCommand(command="status", description="Cek status Premium"),
+        BotCommand(command="help", description="Bantuan"),
+    ])
+
+    asyncio.create_task(premium_watcher())
+    logger.info("BhinnekaBot running...")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped")
