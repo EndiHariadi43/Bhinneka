@@ -2,7 +2,7 @@ name: BhinnekaBot (TON Premium)
 
 on:
   schedule:
-    - cron: "0 */6 * * *"     # jalan tiap 6 jam
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,12 +15,13 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 350       # ~5 jam 50 menit
+    timeout-minutes: 350
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # FIRST RUN: artifact memang belum ada -> continue-on-error: true
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
         with:
@@ -38,6 +39,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Show files (debug)
+        run: ls -al
+
       - name: Run bot (auto-stop after 5h45m)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
@@ -46,6 +50,7 @@ jobs:
           TONCENTER_API_KEY: ${{ secrets.TONCENTER_API_KEY }}
           PREMIUM_PRICE_TON: ${{ secrets.PREMIUM_PRICE_TON }}
           PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
+          PYTHONUNBUFFERED: "1"
         run: |
           timeout 5h45m python -u bhinnekabot.py || true
 
@@ -54,5 +59,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bhinneka-db
-          path: bhinnekabot.db
+          path: bhinneka.db           # <- SAMA dengan DB_PATH di script
           retention-days: 14
