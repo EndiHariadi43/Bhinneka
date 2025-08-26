@@ -1,0 +1,58 @@
+name: BhinnekaBot (TON Premium)
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"     # jalan tiap 6 jam
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bhinnekabot
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350       # ~5 jam 50 menit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore DB artifact (if exists)
+        uses: actions/download-artifact@v4
+        with:
+          name: bhinneka-db
+          path: .
+        continue-on-error: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run bot (auto-stop after 5h45m)
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
+          TONCENTER_API: ${{ secrets.TONCENTER_API }}
+          TONCENTER_API_KEY: ${{ secrets.TONCENTER_API_KEY }}
+          PREMIUM_PRICE_TON: ${{ secrets.PREMIUM_PRICE_TON }}
+          PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
+        run: |
+          timeout 5h45m python -u bhinnekabot.py || true
+
+      - name: Upload DB artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bhinneka-db
+          path: bhinnekabot.db
+          retention-days: 14
