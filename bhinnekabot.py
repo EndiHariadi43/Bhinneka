@@ -12,7 +12,7 @@ import aiosqlite
 import httpx
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -290,6 +290,15 @@ async def cmd_status(msg: Message):
 # ---------------------- Main ----------------------
 async def main():
     await init_db()
+    # set command list (muncul saat user tekan tombol /)
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Welcome + menu"),
+        BotCommand(command="tasks", description="Quest harian"),
+        BotCommand(command="claim", description="Klaim quest (demo)"),
+        BotCommand(command="premium", description="Beli Premium via TON"),
+        BotCommand(command="status", description="Cek status Premium"),
+    ])
+
     asyncio.create_task(premium_watcher())
     print("BhinnekaBot running...")
     await dp.start_polling(bot)
