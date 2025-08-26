@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Run ke-1: artifact mungkin belum ada -> tidak masalah
+      # Run pertama: mungkin belum ada artifact -> abaikan error
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
         with:
@@ -43,6 +43,50 @@ jobs:
       - name: Show files (debug)
         run: ls -al
 
+      # --- Diagnostics & hardening ---
+
+      - name: Validate secrets (fail early if missing)
+        shell: bash
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
+        run: |
+          set -e
+          if [ -z "$BOT_TOKEN" ]; then echo "ERROR: BOT_TOKEN is empty"; exit 1; fi
+          if [ -z "$TON_DEST_ADDRESS" ]; then echo "ERROR: TON_DEST_ADDRESS is empty"; exit 1; fi
+          echo "Secrets look OK."
+
+      - name: Brief env info (safe)
+        shell: bash
+        env:
+          TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
+          PREMIUM_PRICE_TON: ${{ secrets.PREMIUM_PRICE_TON }}
+          PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
+        run: |
+          python -V
+          pip show aiogram aiosqlite httpx python-dotenv | sed -n '1,3p' || true
+          echo "TON_DEST_ADDRESS: ${TON_DEST_ADDRESS}"
+          echo "PREMIUM_PRICE_TON: ${PREMIUM_PRICE_TON}"
+          echo "PREMIUM_DAYS: ${PREMIUM_DAYS}"
+
+      # Jika sebelumnya pernah memakai webhook, ini memastikan polling menerima update
+      - name: Ensure polling (delete webhook)
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" || true
+          echo "Webhook deleted (if any)."
+
+      # Pastikan DB ada supaya upload sukses di run pertama (tanpa heredoc).
+      - name: Ensure DB file exists (first run safety)
+        run: |
+          if [ ! -f bhinneka.db ]; then
+            python -c "import sqlite3; con=sqlite3.connect('bhinneka.db'); con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)'); con.commit(); con.close()"
+          fi
+          ls -l bhinneka.db
+
+      # --- Start bot ---
+
       - name: Run bot (auto-stop after 5h45m)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
@@ -53,15 +97,9 @@ jobs:
           PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
           PYTHONUNBUFFERED: "1"
         run: |
+          set -e
+          echo "Starting BhinnekaBot..."
           timeout 5h45m python -u bhinnekabot.py || true
-
-      # Pastikan DB ada supaya upload sukses di run pertama (tanpa heredoc).
-      - name: Ensure DB file exists (first run safety)
-        run: |
-          if [ ! -f bhinneka.db ]; then
-            python -c "import sqlite3; con=sqlite3.connect('bhinneka.db'); con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)'); con.commit(); con.close()"
-          fi
-          ls -l bhinneka.db
 
       - name: Upload DB artifact
         if: always()
