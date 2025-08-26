@@ -1,0 +1,301 @@
+# bhinnekabot.py
+# BhinnekaBot — Unity in Diversity 🤝
+# Fitur: welcome + quest, premium via TON dengan verifikasi komentar unik on-chain.
+
+import asyncio
+import os
+import time
+import secrets
+from datetime import datetime, timedelta, timezone
+
+import aiosqlite
+import httpx
+from aiogram import Bot, Dispatcher, F
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+TON_DEST = os.getenv("TON_DEST_ADDRESS")          # alamat tujuan TON
+TON_API = os.getenv("TONCENTER_API", "https://toncenter.com/api/v2")
+TON_API_KEY = os.getenv("TONCENTER_API_KEY", "")
+PREMIUM_PRICE_TON = float(os.getenv("PREMIUM_PRICE_TON", "1.0"))
+PREMIUM_DAYS = int(os.getenv("PREMIUM_DAYS", "30"))
+
+assert BOT_TOKEN and TON_DEST, "Set BOT_TOKEN & TON_DEST_ADDRESS di env/secrets"
+
+bot = Bot(BOT_TOKEN, parse_mode="HTML")
+dp = Dispatcher()
+
+DB_PATH = "bhinneka.db"
+
+WELCOME_TEXT = (
+    "👋 <b>Selamat datang di Bhinneka (BHEK) Bot!</b>\n"
+    "BHEK — Unity in Diversity, powered by memes & community.\n\n"
+    "🔹 /tasks — lihat tugas/quest harian\n"
+    "🔹 /premium — posisi istimewa (dukungan TON)\n"
+    "🔹 /status — status akun kamu"
+)
+
+TASKS = [
+    "Join komunitas Telegram: t.me/bhinneka_coin",
+    "Follow X: @bhinneka_coin",
+    "Retweet pinned post (X) & mention #BHEK",
+]
+
+# ---------------------- DB ----------------------
+async def init_db():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT,
+                first_name TEXT,
+                joined_at INTEGER,
+                premium_until INTEGER DEFAULT 0,
+                ref_by INTEGER
+            );
+
+            CREATE TABLE IF NOT EXISTS orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                code TEXT UNIQUE,
+                amount_ton REAL,
+                created_at INTEGER,
+                confirmed_at INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'PENDING'
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_orders_code ON orders(code);
+            """
+        )
+        await db.commit()
+
+async def upsert_user(msg: Message, ref_by: int | None = None):
+    uid = msg.from_user.id
+    username = msg.from_user.username or ""
+    fname = msg.from_user.first_name or ""
+    now = int(time.time())
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT user_id FROM users WHERE user_id=?", (uid,))
+        row = await cur.fetchone()
+        if row:
+            await db.execute(
+                "UPDATE users SET username=?, first_name=? WHERE user_id=?",
+                (username, fname, uid),
+            )
+        else:
+            await db.execute(
+                "INSERT INTO users(user_id, username, first_name, joined_at, ref_by) VALUES (?,?,?,?,?)",
+                (uid, username, fname, now, ref_by),
+            )
+        await db.commit()
+
+async def set_premium(user_id: int, days: int):
+    until = int((datetime.now(timezone.utc) + timedelta(days=days)).timestamp())
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE users SET premium_until=? WHERE user_id=?",
+            (until, user_id),
+        )
+        await db.commit()
+
+async def get_status(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT premium_until FROM users WHERE user_id=?", (user_id,))
+        row = await cur.fetchone()
+        if not row:
+            return "❌ Belum terdaftar."
+        until = row[0] or 0
+        now = int(time.time())
+        if until > now:
+            exp = datetime.fromtimestamp(until, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            return f"🌟 Premium aktif hingga <b>{exp}</b>."
+        return "🟢 Akun terdaftar. Premium: <b>Tidak aktif</b>."
+
+# ---------------------- TON Helpers ----------------------
+def build_ton_deeplink(address: str, amount_ton: float, comment: str) -> str:
+    amount_nano = int(amount_ton * 1_000_000_000)  # 1 TON = 1e9 nanoTON
+    from urllib.parse import quote
+    return f"ton://transfer/{address}?amount={amount_nano}&text={quote(comment)}"
+
+async def ton_get_transactions(address: str, limit: int = 20):
+    params = {"address": address, "limit": limit}
+    headers = {}
+    if TON_API_KEY:
+        headers["X-API-Key"] = TON_API_KEY
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(f"{TON_API}/getTransactions", params=params, headers=headers)
+        r.raise_for_status()
+        return r.json()
+
+def extract_comment(tx: dict) -> str | None:
+    try:
+        msg = tx.get("in_msg") or {}
+        return msg.get("message")
+    except Exception:
+        return None
+
+def extract_amount_ton(tx: dict) -> float:
+    try:
+        msg = tx.get("in_msg") or {}
+        val = int(msg.get("value", "0"))
+        return val / 1_000_000_000
+    except Exception:
+        return 0.0
+
+# ---------------------- Background Verifier ----------------------
+async def premium_watcher():
+    await asyncio.sleep(3)
+    while True:
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                cur = await db.execute(
+                    "SELECT id, user_id, code, amount_ton FROM orders WHERE status='PENDING' ORDER BY id ASC"
+                )
+                orders = await cur.fetchall()
+
+            if not orders:
+                await asyncio.sleep(12)
+                continue
+
+            tx_data = await ton_get_transactions(TON_DEST, limit=40)
+            txs = tx_data.get("result", []) if isinstance(tx_data, dict) else []
+
+            if not txs:
+                await asyncio.sleep(12)
+                continue
+
+            found_updates = []
+            for oid, uid, code, amt in orders:
+                for tx in txs:
+                    comment = extract_comment(tx) or ""
+                    value_ton = extract_amount_ton(tx)
+                    if comment.strip() == code and value_ton + 1e-9 >= float(amt):
+                        found_updates.append((oid, uid))
+
+            if found_updates:
+                async with aiosqlite.connect(DB_PATH) as db:
+                    for oid, uid in found_updates:
+                        now = int(time.time())
+                        await db.execute(
+                            "UPDATE orders SET status='CONFIRMED', confirmed_at=? WHERE id=?",
+                            (now, oid),
+                        )
+                        await db.commit()
+                        await set_premium(uid, PREMIUM_DAYS)
+                        try:
+                            await bot.send_message(
+                                uid,
+                                f"✅ <b>Pembayaran Premium diterima.</b>\n"
+                                f"Terima kasih! Status Premium aktif {PREMIUM_DAYS} hari 🎉",
+                            )
+                        except Exception:
+                            pass
+
+        except Exception as e:
+            print("watcher error:", e)
+
+        await asyncio.sleep(15)
+
+# ---------------------- UI Builders ----------------------
+def premium_keyboard(deeplink: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=deeplink)],
+            [InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")],
+        ]
+    )
+
+# ---------------------- Handlers ----------------------
+@dp.message(CommandStart())
+async def cmd_start(msg: Message):
+    ref_by = None
+    if msg.text and " " in msg.text:
+        try:
+            ref_by = int(msg.text.split(" ", 1)[1].strip())
+        except Exception:
+            ref_by = None
+
+    await upsert_user(msg, ref_by)
+    await msg.answer(WELCOME_TEXT)
+
+@dp.message(Command("tasks"))
+async def cmd_tasks(msg: Message):
+    lines = [f"📋 <b>Quest Harian</b>"]
+    for i, t in enumerate(TASKS, 1):
+        lines.append(f"{i}. {t}")
+    lines.append("\nKetik <code>/claim</code> setelah selesai.")
+    await msg.answer("\n".join(lines))
+
+@dp.message(Command("claim"))
+async def cmd_claim(msg: Message):
+    await msg.answer("✅ Klaim kamu dicatat. (Sistem reward akan diaktifkan setelah Premium)")
+
+@dp.message(Command("premium"))
+async def cmd_premium(msg: Message):
+    uid = msg.from_user.id
+    code = f"BHEK-{uid}-{secrets.token_hex(2).upper()}"
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO orders(user_id, code, amount_ton, created_at) VALUES (?,?,?,?)",
+            (uid, code, PREMIUM_PRICE_TON, int(time.time())),
+        )
+        await db.commit()
+
+    link = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
+    text = (
+        "🌟 <b>Premium / Posisi Istimewa</b>\n\n"
+        f"Harga: <b>{PREMIUM_PRICE_TON} TON</b> untuk {PREMIUM_DAYS} hari.\n"
+        f"Alamat: <code>{TON_DEST}</code>\n"
+        f"Komentar (WAJIB): <code>{code}</code>\n\n"
+        "1) Klik tombol <b>Pay in TON</b> (atau transfer manual)\n"
+        "2) Pastikan <b>comment</b> PERSIS sama\n"
+        "3) Setelah bayar, tekan <b>Saya sudah transfer</b>\n\n"
+        "Bot memverifikasi di blockchain dan otomatis mengaktifkan status Premium ✅"
+    )
+    await msg.answer(text, reply_markup=premium_keyboard(link))
+
+@dp.callback_query(F.data == "check_payment")
+async def cb_check_payment(cb):
+    uid = cb.from_user.id
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT code, amount_ton, status FROM orders WHERE user_id=? ORDER BY id DESC LIMIT 5",
+            (uid,),
+        )
+        rows = await cur.fetchall()
+
+    status = await get_status(uid)
+    if not rows:
+        await cb.message.answer(status + "\n\nTidak ada pembayaran yang tertunda.")
+        await cb.answer()
+        return
+
+    lines = [status, "", "🧾 <b>Riwayat Pembayaran</b> (terakhir):"]
+    for code, amt, st in rows:
+        lines.append(f"• {st}: {amt} TON | comment: <code>{code}</code>")
+    lines.append("\n⏳ Jika baru transfer, tunggu 1–2 menit lalu klik lagi.")
+    await cb.message.answer("\n".join(lines))
+    await cb.answer()
+
+@dp.message(Command("status"))
+async def cmd_status(msg: Message):
+    s = await get_status(msg.from_user.id)
+    await msg.answer(s)
+
+# ---------------------- Main ----------------------
+async def main():
+    await init_db()
+    asyncio.create_task(premium_watcher())
+    print("BhinnekaBot running...")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("Bot stopped")
