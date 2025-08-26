@@ -6,6 +6,7 @@ import asyncio
 import os
 import time
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 
 import aiosqlite
@@ -15,10 +16,13 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from dotenv import load_dotenv
 
+# ---------- ENV & LOGGING ----------
 load_dotenv()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("bhinnekabot")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-TON_DEST = os.getenv("TON_DEST_ADDRESS")          # alamat tujuan TON
+TON_DEST = os.getenv("TON_DEST_ADDRESS")                      # alamat tujuan TON
 TON_API = os.getenv("TONCENTER_API", "https://toncenter.com/api/v2")
 TON_API_KEY = os.getenv("TONCENTER_API_KEY", "")
 PREMIUM_PRICE_TON = float(os.getenv("PREMIUM_PRICE_TON", "1.0"))
@@ -45,7 +49,7 @@ TASKS = [
     "Retweet pinned post (X) & mention #BHEK",
 ]
 
-# ---------------------- DB ----------------------
+# ---------- DB ----------
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(
@@ -70,6 +74,7 @@ async def init_db():
             );
 
             CREATE INDEX IF NOT EXISTS idx_orders_code ON orders(code);
+            CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
             """
         )
         await db.commit()
@@ -116,7 +121,7 @@ async def get_status(user_id: int):
             return f"🌟 Premium aktif hingga <b>{exp}</b>."
         return "🟢 Akun terdaftar. Premium: <b>Tidak aktif</b>."
 
-# ---------------------- TON Helpers ----------------------
+# ---------- TON Helpers ----------
 def build_ton_deeplink(address: str, amount_ton: float, comment: str) -> str:
     amount_nano = int(amount_ton * 1_000_000_000)  # 1 TON = 1e9 nanoTON
     from urllib.parse import quote
@@ -147,12 +152,27 @@ def extract_amount_ton(tx: dict) -> float:
     except Exception:
         return 0.0
 
-# ---------------------- Background Verifier ----------------------
+def matches_destination(tx: dict, addr: str) -> bool:
+    try:
+        dest = (tx.get("in_msg") or {}).get("destination", "")
+        return dest == addr
+    except Exception:
+        return False
+
+# ---------- Background Verifier ----------
 async def premium_watcher():
     await asyncio.sleep(3)
     while True:
         try:
+            # Tandai order PENDING yang kadaluarsa (>24 jam) sebagai EXPIRED
+            now_ts = int(time.time())
             async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute(
+                    "UPDATE orders SET status='EXPIRED' WHERE status='PENDING' AND created_at < ?",
+                    (now_ts - 24 * 3600,),
+                )
+                await db.commit()
+
                 cur = await db.execute(
                     "SELECT id, user_id, code, amount_ton FROM orders WHERE status='PENDING' ORDER BY id ASC"
                 )
@@ -172,9 +192,11 @@ async def premium_watcher():
             found_updates = []
             for oid, uid, code, amt in orders:
                 for tx in txs:
+                    if not matches_destination(tx, TON_DEST):
+                        continue
                     comment = extract_comment(tx) or ""
                     value_ton = extract_amount_ton(tx)
-                    if comment.strip() == code and value_ton + 1e-9 >= float(amt):
+                    if comment.strip() == code and (value_ton + 1e-9) >= float(amt):
                         found_updates.append((oid, uid))
 
             if found_updates:
@@ -187,6 +209,7 @@ async def premium_watcher():
                         )
                         await db.commit()
                         await set_premium(uid, PREMIUM_DAYS)
+                        logger.info("Premium confirmed uid=%s order_id=%s", uid, oid)
                         try:
                             await bot.send_message(
                                 uid,
@@ -196,115 +219,7 @@ async def premium_watcher():
                         except Exception:
                             pass
 
+        except httpx.HTTPError as e:
+            logger.warning("TON API error: %s", e)
         except Exception as e:
-            print("watcher error:", e)
-
-        await asyncio.sleep(15)
-
-# ---------------------- UI Builders ----------------------
-def premium_keyboard(deeplink: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=deeplink)],
-            [InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")],
-        ]
-    )
-
-# ---------------------- Handlers ----------------------
-@dp.message(CommandStart())
-async def cmd_start(msg: Message):
-    ref_by = None
-    if msg.text and " " in msg.text:
-        try:
-            ref_by = int(msg.text.split(" ", 1)[1].strip())
-        except Exception:
-            ref_by = None
-
-    await upsert_user(msg, ref_by)
-    await msg.answer(WELCOME_TEXT)
-
-@dp.message(Command("tasks"))
-async def cmd_tasks(msg: Message):
-    lines = [f"📋 <b>Quest Harian</b>"]
-    for i, t in enumerate(TASKS, 1):
-        lines.append(f"{i}. {t}")
-    lines.append("\nKetik <code>/claim</code> setelah selesai.")
-    await msg.answer("\n".join(lines))
-
-@dp.message(Command("claim"))
-async def cmd_claim(msg: Message):
-    await msg.answer("✅ Klaim kamu dicatat. (Sistem reward akan diaktifkan setelah Premium)")
-
-@dp.message(Command("premium"))
-async def cmd_premium(msg: Message):
-    uid = msg.from_user.id
-    code = f"BHEK-{uid}-{secrets.token_hex(2).upper()}"
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT OR IGNORE INTO orders(user_id, code, amount_ton, created_at) VALUES (?,?,?,?)",
-            (uid, code, PREMIUM_PRICE_TON, int(time.time())),
-        )
-        await db.commit()
-
-    link = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
-    text = (
-        "🌟 <b>Premium / Posisi Istimewa</b>\n\n"
-        f"Harga: <b>{PREMIUM_PRICE_TON} TON</b> untuk {PREMIUM_DAYS} hari.\n"
-        f"Alamat: <code>{TON_DEST}</code>\n"
-        f"Komentar (WAJIB): <code>{code}</code>\n\n"
-        "1) Klik tombol <b>Pay in TON</b> (atau transfer manual)\n"
-        "2) Pastikan <b>comment</b> PERSIS sama\n"
-        "3) Setelah bayar, tekan <b>Saya sudah transfer</b>\n\n"
-        "Bot memverifikasi di blockchain dan otomatis mengaktifkan status Premium ✅"
-    )
-    await msg.answer(text, reply_markup=premium_keyboard(link))
-
-@dp.callback_query(F.data == "check_payment")
-async def cb_check_payment(cb):
-    uid = cb.from_user.id
-    async with aiosqlite.connect(DB_PATH) as db:
-        cur = await db.execute(
-            "SELECT code, amount_ton, status FROM orders WHERE user_id=? ORDER BY id DESC LIMIT 5",
-            (uid,),
-        )
-        rows = await cur.fetchall()
-
-    status = await get_status(uid)
-    if not rows:
-        await cb.message.answer(status + "\n\nTidak ada pembayaran yang tertunda.")
-        await cb.answer()
-        return
-
-    lines = [status, "", "🧾 <b>Riwayat Pembayaran</b> (terakhir):"]
-    for code, amt, st in rows:
-        lines.append(f"• {st}: {amt} TON | comment: <code>{code}</code>")
-    lines.append("\n⏳ Jika baru transfer, tunggu 1–2 menit lalu klik lagi.")
-    await cb.message.answer("\n".join(lines))
-    await cb.answer()
-
-@dp.message(Command("status"))
-async def cmd_status(msg: Message):
-    s = await get_status(msg.from_user.id)
-    await msg.answer(s)
-
-# ---------------------- Main ----------------------
-async def main():
-    await init_db()
-    # set command list (muncul saat user tekan tombol /)
-    await bot.set_my_commands([
-        BotCommand(command="start", description="Welcome + menu"),
-        BotCommand(command="tasks", description="Quest harian"),
-        BotCommand(command="claim", description="Klaim quest (demo)"),
-        BotCommand(command="premium", description="Beli Premium via TON"),
-        BotCommand(command="status", description="Cek status Premium"),
-    ])
-
-    asyncio.create_task(premium_watcher())
-    print("BhinnekaBot running...")
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        print("Bot stopped")
+            logger.exception("watcher error: %s
