@@ -55,20 +55,13 @@ jobs:
         run: |
           timeout 5h45m python -u bhinnekabot.py || true
 
-      # Pastikan DB ada supaya upload sukses di run pertama.
+      # Pastikan DB ada supaya upload sukses di run pertama (tanpa heredoc).
       - name: Ensure DB file exists (first run safety)
-        shell: bash
         run: |
-          python - <<'PY'
-import os, sqlite3
-db = "bhinneka.db"
-if not os.path.exists(db):
-    con = sqlite3.connect(db)
-    con.execute("CREATE TABLE IF NOT EXISTS _init(id INTEGER)")
-    con.commit()
-    con.close()
-print("DB ready:", os.path.exists(db))
-PY
+          if [ ! -f bhinneka.db ]; then
+            python -c "import sqlite3; con=sqlite3.connect('bhinneka.db'); con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)'); con.commit(); con.close()"
+          fi
+          ls -l bhinneka.db
 
       - name: Upload DB artifact
         if: always()
