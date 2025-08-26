@@ -2,7 +2,7 @@ name: BhinnekaBot (TON Premium)
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 */6 * * *"        # UTC, tiap 6 jam
   workflow_dispatch:
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # FIRST RUN: artifact memang belum ada -> continue-on-error: true
+      # Run ke-1 memang belum ada artifact; abaikan errornya
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
         with:
@@ -33,6 +33,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install deps
         run: |
@@ -54,14 +55,22 @@ jobs:
         run: |
           timeout 5h45m python -u bhinnekabot.py || true
 
+      # Pastikan file DB selalu ada supaya upload sukses di run pertama
       - name: Ensure DB file exists (first run safety)
         run: |
-          [ -f bhinneka.db ] || sqlite3 bhinneka.db "CREATE TABLE IF NOT EXISTS _init(id INTEGER);"
+          [ -f bhinneka.db ] || python - <<'PY'
+import aiosqlite, asyncio
+async def main():
+    async with aiosqlite.connect("bhinneka.db") as db:
+        await db.execute("CREATE TABLE IF NOT EXISTS _init(id INTEGER)")
+        await db.commit()
+asyncio.run(main())
+PY
 
       - name: Upload DB artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bhinneka-db
-          path: bhinneka.db           # <- SAMA dengan DB_PATH di script
+          path: bhinneka.db
           retention-days: 14
