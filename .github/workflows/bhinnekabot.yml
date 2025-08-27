@@ -80,7 +80,7 @@ jobs:
           set -e
           echo "Starting BhinnekaBot..."
           # Simpan STDOUT+STDERR ke log agar mudah dianalisis
-          timeout 5h45m python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log
+          timeout 345m python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log
 
       # upload DB + LOG setiap kali run (berhasil/gagal)
       - name: Upload artifacts (DB + logs)
