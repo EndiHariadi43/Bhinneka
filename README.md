@@ -12,7 +12,7 @@ This repo contains:
 
 ---
 
-## 🚀 Earn Passive Income with Referrals
+## 🚀 Earn Passive Income
 
 🔥 Don’t miss this chance to earn passive income!  
 Just share your referral link and start earning effortlessly.  
