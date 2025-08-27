@@ -10,6 +10,19 @@ This repo contains:
 - Minimal **ERC20/BEP20** contract (OpenZeppelin-based)
 - GitHub Actions workflow to run the bot 24/7 (long polling, rotating every 6h)
 
+---
+
+## 🚀 Earn Passive Income with Referrals
+
+🔥 Don’t miss this chance to earn passive income!  
+Just share your referral link and start earning effortlessly.  
+The more friends you invite, the bigger your rewards!  
+
+🔗 **Referral link:**  
+[https://four.meme/token/0x10bf27e03364b9cb471641893bbe4895dddc4444?code=K3QL9TE2KCHC](https://four.meme/token/0x10bf27e03364b9cb471641893bbe4895dddc4444?code=K3QL9TE2KCHC)
+
+---
+
 ## Quick Start (Local)
 
 ```bash
