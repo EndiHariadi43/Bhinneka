@@ -2,7 +2,7 @@ name: BhinnekaBot (TON Premium)
 
 on:
   schedule:
-    - cron: "0 */6 * * *"      # UTC, tiap 6 jam
+    - cron: "0 * * * *"           # jalan tiap jam (UTC)
   workflow_dispatch:
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Run pertama: mungkin belum ada artifact -> abaikan error
+      # run pertama: artifact bisa belum ada → abaikan error
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
         with:
@@ -43,51 +43,36 @@ jobs:
       - name: Show files (debug)
         run: ls -al
 
-      # --- Diagnostics & hardening ---
-
-      - name: Validate secrets (fail early if missing)
-        shell: bash
+      # sanity check: token valid?
+      - name: Check Telegram token (getMe)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
         run: |
           set -e
-          if [ -z "$BOT_TOKEN" ]; then echo "ERROR: BOT_TOKEN is empty"; exit 1; fi
-          if [ -z "$TON_DEST_ADDRESS" ]; then echo "ERROR: TON_DEST_ADDRESS is empty"; exit 1; fi
-          echo "Secrets look OK."
+          curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getMe"
 
-      - name: Brief env info (safe)
-        shell: bash
-        env:
-          TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
-          PREMIUM_PRICE_TON: ${{ secrets.PREMIUM_PRICE_TON }}
-          PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
-        run: |
-          python -V
-          pip show aiogram aiosqlite httpx python-dotenv | sed -n '1,3p' || true
-          echo "TON_DEST_ADDRESS: ${TON_DEST_ADDRESS}"
-          echo "PREMIUM_PRICE_TON: ${PREMIUM_PRICE_TON}"
-          echo "PREMIUM_DAYS: ${PREMIUM_DAYS}"
-
-      # Jika sebelumnya pernah memakai webhook, ini memastikan polling menerima update
+      # pastikan polling (hapus webhook kalau ada)
       - name: Ensure polling (delete webhook)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" || true
-          echo "Webhook deleted (if any)."
+          curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook"
 
-      # Pastikan DB ada supaya upload sukses di run pertama (tanpa heredoc).
+      # pastikan DB ada agar upload sukses di run pertama
       - name: Ensure DB file exists (first run safety)
         run: |
           if [ ! -f bhinneka.db ]; then
-            python -c "import sqlite3; con=sqlite3.connect('bhinneka.db'); con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)'); con.commit(); con.close()"
+            python - <<'PY'
+import sqlite3
+con = sqlite3.connect('bhinneka.db')
+con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
+con.commit(); con.close()
+PY
           fi
           ls -l bhinneka.db
 
-      # --- Start bot ---
-
-      - name: Run bot (auto-stop after 5h45m)
+      # JALANKAN BOT — TANPA "|| true"!
+      - name: Run bot (with logs, 5h45m timeout)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
@@ -99,9 +84,22 @@ jobs:
         run: |
           set -e
           echo "Starting BhinnekaBot..."
-          timeout 5h45m python -u bhinnekabot.py || true
+          # Simpan STDOUT+STDERR ke log agar mudah dianalisis
+          timeout 5h45m python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log
 
-      - name: Upload DB artifact
+      # upload DB + LOG setiap kali run (berhasil/gagal)
+      - name: Upload artifacts (DB + logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bhinneka-run
+          path: |
+            bhinneka.db
+            bhinnekabot.log
+          retention-days: 14
+
+      # simpan DB dengan nama tetap (untuk dipakai run berikutnya)
+      - name: Upload DB artifact (compat)
         if: always()
         uses: actions/upload-artifact@v4
         with:
