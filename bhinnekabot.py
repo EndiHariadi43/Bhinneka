@@ -235,20 +235,24 @@ def premium_keyboard(deeplink: str) -> InlineKeyboardMarkup:
 @dp.message(CommandStart())
 async def cmd_start(msg: Message):
     logger.info("START from uid=%s username=%s", msg.from_user.id, msg.from_user.username)
+    await upsert_user(msg)
+    await msg.answer(WELCOME_TEXT)
+    logger.info("START replied to uid=%s", msg.from_user.id)
 
-    ref_by = None
-    if msg.text and " " in msg.text:
-        try:
-            ref_by = int(msg.text.split(" ", 1)[1].strip())
-        except Exception:
-            ref_by = None
-
-    try:
-        await upsert_user(msg, ref_by)
-        await msg.answer(WELCOME_TEXT)
-        logger.info("START replied to uid=%s", msg.from_user.id)
-    except Exception as e:
-        logger.exception("START failed: %s", e)
+async def main():
+    logger.info("Bot booting...")
+    await init_db()
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Welcome + menu"),
+        BotCommand(command="tasks", description="Quest harian"),
+        BotCommand(command="claim", description="Klaim quest (demo)"),
+        BotCommand(command="premium", description="Beli Premium via TON"),
+        BotCommand(command="status", description="Cek status Premium"),
+        BotCommand(command="help", description="Bantuan"),
+    ])
+    asyncio.create_task(premium_watcher())
+    logger.info("Start polling...")
+    await dp.start_polling(bot)
 
 @dp.message(Command("tasks"))
 async def cmd_tasks(msg: Message):
