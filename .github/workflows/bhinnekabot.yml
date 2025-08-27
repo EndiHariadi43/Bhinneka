@@ -67,7 +67,7 @@ jobs:
           ls -l bhinneka.db
 
       # JALANKAN BOT — TANPA "|| true"!
-      - name: Run bot (with logs, 5h45m timeout)
+      - name: Run bot (with logs, 345m timeout)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
@@ -79,7 +79,7 @@ jobs:
         run: |
           set -e
           echo "Starting BhinnekaBot..."
-          # Simpan STDOUT+STDERR ke log agar mudah dianalisis
+          # gunakan menit, bukan 5h45m
           timeout 345m python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log
 
       # upload DB + LOG setiap kali run (berhasil/gagal)
