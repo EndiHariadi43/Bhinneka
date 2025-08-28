@@ -14,7 +14,8 @@ import httpx
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
-from aiogram.enums import ChatMemberStatus
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ChatMemberStatus, ParseMode
 from dotenv import load_dotenv
 
 # ---------- ENV & LOGGING ----------
@@ -36,16 +37,10 @@ COMMUNITY_CHAT_ID = "@bhinneka_coin"
 
 assert BOT_TOKEN and TON_DEST, "Set BOT_TOKEN & TON_DEST_ADDRESS di env/secrets"
 
-bot = Bot(BOT_TOKEN, parse_mode="HTML")
+bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 DB_PATH = "bhinneka.db"
-
-status_ok = member.status in {
-    ChatMemberStatus.MEMBER,
-    ChatMemberStatus.ADMINISTRATOR,
-    ChatMemberStatus.CREATOR,
-}
 
 WELCOME_TEXT = (
     "👋 <b>Selamat datang di Bhinneka (BHEK) Bot!</b>\n"
@@ -271,7 +266,11 @@ async def cmd_tasks(msg: Message):
 async def cmd_claim(msg: Message):
     try:
         member = await bot.get_chat_member(COMMUNITY_CHAT_ID, msg.from_user.id)
-        status_ok = member.status in ("member", "administrator", "creator")
+        status_ok = member.status in {
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.ADMINISTRATOR,
+            ChatMemberStatus.CREATOR,
+        }
         if status_ok:
             await msg.answer(
                 "✅ Klaim kamu dicatat. (Sistem reward akan diaktifkan setelah Premium). Terima kasih sudah join!",
