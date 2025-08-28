@@ -437,7 +437,7 @@ async def cmd_help(msg: Message):
         "📖 <b>Command List</b>\n\n"
         "/start — Welcome & menu\n"
         "/tasks — Quest harian\n"
-        "/claim — Klaim quest (demo)\n"
+        "/claim — Klaim quest\n"
         "/queststatus — Lihat progres quest\n"
         "/points — Lihat total poin\n"
         "/premium — Beli Premium via TON\n"
