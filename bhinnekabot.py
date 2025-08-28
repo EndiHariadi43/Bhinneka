@@ -420,11 +420,13 @@ async def cmd_premium(msg: Message):
         f"Harga: <b>{PREMIUM_PRICE_TON} TON</b> untuk {PREMIUM_DAYS} hari.\n"
         f"Alamat: <code>{TON_DEST}</code>\n"
         f"Komentar (WAJIB): <code>{code}</code>\n\n"
-        "1) Klik tombol <b>Pay in TON (App)</b> atau <b>Pay via Web (Tonhub)</b>\n"
+        "1) Pilih salah satu: <b>Pay in TON (App)</b>, "
+        "<b>Pay via Web (Tonhub)</b>, atau <b>Pay via Telegram Wallet</b>\n"
         "2) Pastikan <b>comment</b> PERSIS sama\n"
         "3) Setelah bayar, tekan <b>Saya sudah transfer</b>\n\n"
         "Bot memverifikasi di blockchain dan otomatis mengaktifkan status Premium ✅"
     )
+
     
     await msg.answer(
         text,
@@ -456,6 +458,7 @@ async def cb_check_payment(cb):
 
 @dp.message(Command("status"))
 async def cmd_status(msg: Message):
+    await upsert_user(msg)  # opsional, auto terdaftar
     s = await get_status(msg.from_user.id)
     await msg.answer(s, reply_markup=MAIN_KB)
 
