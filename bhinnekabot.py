@@ -183,10 +183,18 @@ def build_ton_deeplink(address: str, amount_ton: float, comment: str) -> str:
     amount_nano = int(amount_ton * 1_000_000_000)
     return f"ton://transfer/{address}?amount={amount_nano}&text={quote(comment)}"
 
+def build_tgwallet_link(address: str, amount_ton: float, comment: str) -> str:
+    from urllib.parse import quote
+    return f"https://t.me/wallet/send/{address}?amount={amount_ton}&asset=TON&text={quote(comment)}"
+
 def build_tonhub_link(address: str, amount_ton: float, comment: str) -> str:
     from urllib.parse import quote
     amount_nano = int(amount_ton * 1_000_000_000)
     return f"https://tonhub.com/transfer/{address}?amount={amount_nano}&text={quote(comment)}"
+
+def build_tonviewer_address(address: str) -> str:
+    # Explorer saja (bukan halaman transfer).
+    return f"https://tonviewer.com/{address}"
 
 def build_tonviewer_link(address: str, amount_ton: float, comment: str) -> str:
     from urllib.parse import quote
@@ -292,24 +300,16 @@ async def premium_watcher():
         await asyncio.sleep(15)
 
 # ---------- Inline keyboards ----------
-#def premium_keyboard(deeplink_app: str, deeplink_web: str) -> InlineKeyboardMarkup:
-#    return InlineKeyboardMarkup(
-#        inline_keyboard=[
-#            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=deeplink_app)],
-#            [InlineKeyboardButton(text="🌐 Pay via Web (Tonhub)", url=deeplink_web)],
-#            [InlineKeyboardButton(text="🌐 Pay via Web (Tonviewer)", url=deeplink_web)],
-#            [InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")],
-#        ]
-#    )
-
-def premium_keyboard(link_app: str, link_hub: str | None = None, link_viewer: str | None = None) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton(text="🔗 Pay in TON (App)", url=link_app)]]
-    if link_hub:
-        rows.append([InlineKeyboardButton(text="🌐 Pay via Web (Tonhub)", url=link_hub)])
-    if link_viewer:
-        rows.append([InlineKeyboardButton(text="🌐 Pay via Web (Tonviewer)", url=link_viewer)])
-    rows.append([InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+def premium_keyboard(link_app: str, link_tonhub: str, link_tgwallet: str, link_explorer: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=link_app)],
+            [InlineKeyboardButton(text="🌐 Pay via Web (Tonhub)", url=link_tonhub)],
+            [InlineKeyboardButton(text="💳 Pay via Telegram Wallet", url=link_tgwallet)],
+            [InlineKeyboardButton(text="👁️ Lihat alamat di Tonviewer", url=link_explorer)],
+            [InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")],
+        ]
+    )
 
 # ---------- Handlers ----------
 @dp.message(CommandStart())
@@ -410,22 +410,26 @@ async def cmd_premium(msg: Message):
 
     logger.info("Order created uid=%s code=%s price=%.3f", uid, code, PREMIUM_PRICE_TON)
 
-    link_app    = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
-    link_hub    = build_tonhub_link(TON_DEST, PREMIUM_PRICE_TON, code)
-    link_viewer = build_tonviewer_link(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_app = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_web = build_tonhub_link(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_tgwallet = build_tgwallet_link(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_explorer = build_tonviewer_address(TON_DEST)
 
     text = (
         "🌟 <b>Premium / Posisi Istimewa</b>\n\n"
         f"Harga: <b>{PREMIUM_PRICE_TON} TON</b> untuk {PREMIUM_DAYS} hari.\n"
         f"Alamat: <code>{TON_DEST}</code>\n"
         f"Komentar (WAJIB): <code>{code}</code>\n\n"
-        "1) Klik tombol <b>Pay in TON</b> (atau via web)\n"
+        "1) Klik tombol <b>Pay in TON (App)</b> atau <b>Pay via Web (Tonhub)</b>\n"
         "2) Pastikan <b>comment</b> PERSIS sama\n"
         "3) Setelah bayar, tekan <b>Saya sudah transfer</b>\n\n"
         "Bot memverifikasi di blockchain dan otomatis mengaktifkan status Premium ✅"
     )
-
-    await msg.answer(text, reply_markup=premium_keyboard(link_app, link_hub, link_viewer))
+    
+    await msg.answer(
+        text,
+        reply_markup=premium_keyboard(link_app, link_web, link_tgwallet, link_explorer)
+    )
 
 @dp.callback_query(F.data == "check_payment")
 async def cb_check_payment(cb):
