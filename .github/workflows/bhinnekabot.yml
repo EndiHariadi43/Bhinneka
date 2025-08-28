@@ -48,15 +48,16 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          set -e
-          curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getMe"
+          set -euo pipefail
+          curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getMe" | tee getme.json
 
       # pastikan polling (hapus webhook kalau ada)
       - name: Ensure polling (delete webhook)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook"
+          set -euo pipefail
+          curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" | tee delwh.json
 
       # pastikan DB ada agar upload sukses di run pertama
       - name: Ensure DB file exists (first run safety)
@@ -77,10 +78,10 @@ jobs:
           PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
           PYTHONUNBUFFERED: "1"
         run: |
-          set -e
+          set -euo pipefail
           echo "Starting BhinnekaBot..."
-          # gunakan menit, bukan 5h45m
           timeout 345m python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log
+          echo "python exit code: ${PIPESTATUS[0]}"
 
       # upload DB + LOG setiap kali run (berhasil/gagal)
       - name: Upload artifacts (DB + logs)
@@ -91,6 +92,8 @@ jobs:
           path: |
             bhinneka.db
             bhinnekabot.log
+            getme.json
+            delwh.json
           retention-days: 14
 
       # simpan DB dengan nama tetap (untuk dipakai run berikutnya)
