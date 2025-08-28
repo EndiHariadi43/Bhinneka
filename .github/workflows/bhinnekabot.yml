@@ -2,7 +2,8 @@ name: BhinnekaBot (TON Premium)
 
 on:
   schedule:
-    - cron: "0 * * * *"           # jalan tiap jam (UTC)
+    #- cron: "0 * * * *"           # jalan tiap jam (UTC)
+    - cron: "0 */6 * * *"   # tiap 6 jam
   workflow_dispatch:
 
 permissions:
@@ -80,15 +81,14 @@ jobs:
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
-          # Jalankan dengan timeout; simpan exit code proses python (bukan tee)
-          ( timeout 345m python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log ); ec=${PIPESTATUS[0]}
-          echo "python exit code: $ec"
-          # 124 = timeout -> anggap sukses (rotasi terjadwal)
-          if [ "$ec" = "124" ]; then
+          # Jalankan di subshell bash dengan -o pipefail supaya status pipeline akurat
+          timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
+          ec=$?
+          echo "exit code: $ec"
+          if [ "$ec" -eq 124 ]; then
             echo "Rotation timeout reached — treating as success."
             exit 0
           fi
-          # Kode lain = error -> fail job
           exit "$ec"
 
       # upload DB + LOG setiap kali run (berhasil/gagal)
