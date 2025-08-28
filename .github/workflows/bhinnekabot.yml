@@ -57,16 +57,17 @@ jobs:
           curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" | tee delwh.json
 
       - name: Ensure DB file exists (first run safety)
-        run: |
-          if [ ! -f bhinneka.db ]; then
-            python - <<'PY'
-            import sqlite3
-            con = sqlite3.connect('bhinneka.db')
-            con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
-            con.commit(); con.close()
-            PY
-          fi
-          ls -l bhinneka.db
+  run: |
+    if [ ! -f bhinneka.db ]; then
+      python - <<'PY'
+import sqlite3
+con = sqlite3.connect('bhinneka.db')
+con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
+con.commit()
+con.close()
+PY
+    fi
+    ls -l bhinneka.db
 
       - name: Run bot (with logs, 345m timeout)
         env:
