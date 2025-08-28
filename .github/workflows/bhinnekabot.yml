@@ -69,7 +69,7 @@ jobs:
           ls -l bhinneka.db
 
       # JALANKAN BOT — TANPA "|| true"!
-      - name: Run bot (with logs, 345m timeout)
+      - name: Run bot (short test 2m) #(with logs, 345m timeout)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
@@ -82,7 +82,7 @@ jobs:
           set -euo pipefail
           echo "Starting BhinnekaBot..."
           # Jalankan di subshell bash dengan -o pipefail supaya status pipeline akurat
-          timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
+          timeout 2m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
           echo "exit code: $ec"
           if [ "$ec" -eq 124 ]; then
