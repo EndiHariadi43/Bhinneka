@@ -14,6 +14,7 @@ import httpx
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
+from aiogram.enums import ChatMemberStatus
 from dotenv import load_dotenv
 
 # ---------- ENV & LOGGING ----------
@@ -39,6 +40,12 @@ bot = Bot(BOT_TOKEN, parse_mode="HTML")
 dp = Dispatcher()
 
 DB_PATH = "bhinneka.db"
+
+status_ok = member.status in {
+    ChatMemberStatus.MEMBER,
+    ChatMemberStatus.ADMINISTRATOR,
+    ChatMemberStatus.CREATOR,
+}
 
 WELCOME_TEXT = (
     "👋 <b>Selamat datang di Bhinneka (BHEK) Bot!</b>\n"
