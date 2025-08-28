@@ -28,6 +28,11 @@ TON_API_KEY = os.getenv("TONCENTER_API_KEY", "")
 PREMIUM_PRICE_TON = float(os.getenv("PREMIUM_PRICE_TON", "1.0"))
 PREMIUM_DAYS = int(os.getenv("PREMIUM_DAYS", "30"))
 
+# ==== KOMUNITAS & GRUP ====
+COMMUNITY_LINK = "https://t.me/bhinneka_coin"   # grup/channel komunitas
+X_LINK         = "https://x.com/bhinneka_coin"  # opsional
+COMMUNITY_CHAT_ID = "@bhinneka_coin"
+
 assert BOT_TOKEN and TON_DEST, "Set BOT_TOKEN & TON_DEST_ADDRESS di env/secrets"
 
 bot = Bot(BOT_TOKEN, parse_mode="HTML")
@@ -44,10 +49,18 @@ WELCOME_TEXT = (
 )
 
 TASKS = [
-    "Join komunitas Telegram: t.me/bhinneka_coin",
-    "Follow X: @bhinneka_coin",
+    f'Join komunitas Telegram: <a href="{COMMUNITY_LINK}">@bhinneka_coin</a>',
+    "Follow X (Twitter): <i>opsional</i>",
     "Retweet pinned post (X) & mention #BHEK",
 ]
+
+# ---------- MAIN KEYBOARD (GLOBAL, REUSABLE) ----------
+MAIN_KB = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="👥 Join Telegram", url=COMMUNITY_LINK)],
+        [InlineKeyboardButton(text="🐦 Follow X", url=X_LINK)],
+    ]
+)
 
 # ---------- DB ----------
 async def init_db():
@@ -222,7 +235,7 @@ async def premium_watcher():
 
         await asyncio.sleep(15)
 
-# ---------- UI Builders ----------
+# ---------- Inline keyboards ----------
 def premium_keyboard(deeplink: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -236,35 +249,37 @@ def premium_keyboard(deeplink: str) -> InlineKeyboardMarkup:
 async def cmd_start(msg: Message):
     logger.info("START from uid=%s username=%s", msg.from_user.id, msg.from_user.username)
     await upsert_user(msg)
-    await msg.answer(WELCOME_TEXT)
+    await msg.answer(WELCOME_TEXT, reply_markup=MAIN_KB)
     logger.info("START replied to uid=%s", msg.from_user.id)
-
-async def main():
-    logger.info("Bot booting...")
-    await init_db()
-    await bot.set_my_commands([
-        BotCommand(command="start", description="Welcome + menu"),
-        BotCommand(command="tasks", description="Quest harian"),
-        BotCommand(command="claim", description="Klaim quest (demo)"),
-        BotCommand(command="premium", description="Beli Premium via TON"),
-        BotCommand(command="status", description="Cek status Premium"),
-        BotCommand(command="help", description="Bantuan"),
-    ])
-    asyncio.create_task(premium_watcher())
-    logger.info("Start polling...")
-    await dp.start_polling(bot)
 
 @dp.message(Command("tasks"))
 async def cmd_tasks(msg: Message):
-    lines = [f"📋 <b>Quest Harian</b>"]
+    lines = ["📋 <b>Quest Harian</b>"]
     for i, t in enumerate(TASKS, 1):
         lines.append(f"{i}. {t}")
     lines.append("\nKetik <code>/claim</code> setelah selesai.")
-    await msg.answer("\n".join(lines))
+    await msg.answer("\n".join(lines), reply_markup=MAIN_KB)
 
 @dp.message(Command("claim"))
 async def cmd_claim(msg: Message):
-    await msg.answer("✅ Klaim kamu dicatat. (Sistem reward akan diaktifkan setelah Premium)")
+    try:
+        member = await bot.get_chat_member(COMMUNITY_CHAT_ID, msg.from_user.id)
+        status_ok = member.status in ("member", "administrator", "creator")
+        if status_ok:
+            await msg.answer(
+                "✅ Klaim kamu dicatat. (Sistem reward akan diaktifkan setelah Premium). Terima kasih sudah join!",
+                reply_markup=MAIN_KB
+            )
+        else:
+            await msg.answer(
+                "❌ Kamu belum terdeteksi di grup. Silakan join via tombol di /tasks.",
+                reply_markup=MAIN_KB
+            )
+    except Exception:
+        await msg.answer(
+            "⚠️ Tidak bisa memverifikasi. Pastikan bot sudah ada di grup dan coba lagi.",
+            reply_markup=MAIN_KB
+        )
 
 @dp.message(Command("premium"))
 async def cmd_premium(msg: Message):
@@ -295,7 +310,7 @@ async def cmd_premium(msg: Message):
     )
     await msg.answer(text, reply_markup=premium_keyboard(link))
 
-@dp.callback_query(F.data == "check_payment")
+@dp.callback_query(F.data == "check_payment"))
 async def cb_check_payment(cb):
     uid = cb.from_user.id
     async with aiosqlite.connect(DB_PATH) as db:
@@ -307,7 +322,7 @@ async def cb_check_payment(cb):
 
     status = await get_status(uid)
     if not rows:
-        await cb.message.answer(status + "\n\nTidak ada pembayaran yang tertunda.")
+        await cb.message.answer(status + "\n\nTidak ada pembayaran yang tertunda.", reply_markup=MAIN_KB)
         await cb.answer()
         return
 
@@ -315,13 +330,13 @@ async def cb_check_payment(cb):
     for code, amt, st in rows:
         lines.append(f"• {st}: {amt} TON | comment: <code>{code}</code>")
     lines.append("\n⏳ Jika baru transfer, tunggu 1–2 menit lalu klik lagi.")
-    await cb.message.answer("\n".join(lines))
+    await cb.message.answer("\n".join(lines), reply_markup=MAIN_KB)
     await cb.answer()
 
 @dp.message(Command("status"))
 async def cmd_status(msg: Message):
     s = await get_status(msg.from_user.id)
-    await msg.answer(s)
+    await msg.answer(s, reply_markup=MAIN_KB)
 
 @dp.message(Command("help"))
 async def cmd_help(msg: Message):
@@ -332,11 +347,13 @@ async def cmd_help(msg: Message):
         "/claim — Klaim quest (demo)\n"
         "/premium — Beli Premium via TON\n"
         "/status — Cek status Premium\n"
-        "/help — Panduan semua command"
+        "/help — Panduan semua command",
+        reply_markup=MAIN_KB
     )
 
 # ---------- Main ----------
 async def main():
+    logger.info("Bot booting...")
     await init_db()
 
     # set menu commands
