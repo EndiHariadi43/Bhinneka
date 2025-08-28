@@ -477,6 +477,19 @@ async def cmd_help(msg: Message):
         reply_markup=MAIN_KB
     )
 
+@dp.message(CommandStart())
+async def cmd_start(msg: Message):
+    logger.info("START from uid=%s username=%s", msg.from_user.id, msg.from_user.username)
+
+    # Tambahan: log explicit bahwa command /start diterima
+    logger.info(">>> /start command diterima dan sedang diproses...")
+
+    await upsert_user(msg)
+    await msg.answer(WELCOME_TEXT, reply_markup=MAIN_KB)
+
+    # Tambahan: log explicit bahwa balasan sudah dikirim
+    logger.info(">>> /start balasan berhasil dikirim ke uid=%s", msg.from_user.id)
+    
 # ---------- Main ----------
 async def main():
     logger.info("Bot booting...")
