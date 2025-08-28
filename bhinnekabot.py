@@ -179,20 +179,18 @@ async def get_points(user_id: int) -> int:
 
 # ---------- TON Helpers ----------
 def build_ton_deeplink(address: str, amount_ton: float, comment: str) -> str:
-    amount_nano = int(amount_ton * 1_000_000_000)  # 1 TON = 1e9 nanoTON
     from urllib.parse import quote
+    amount_nano = int(amount_ton * 1_000_000_000)
     return f"ton://transfer/{address}?amount={amount_nano}&text={quote(comment)}"
 
 def build_tonhub_link(address: str, amount_ton: float, comment: str) -> str:
-    """
-    Alternatif web: buka halaman Tonhub agar user tanpa handler ton://
-    tetap bisa membayar dari browser.
-    """
     from urllib.parse import quote
     amount_nano = int(amount_ton * 1_000_000_000)
-    # tonhub & tonviewer keduanya support query: amount (nano) + text (comment)
     return f"https://tonhub.com/transfer/{address}?amount={amount_nano}&text={quote(comment)}"
-    # opsi lain (sama saja)
+
+def build_tonviewer_link(address: str, amount_ton: float, comment: str) -> str:
+    from urllib.parse import quote
+    amount_nano = int(amount_ton * 1_000_000_000)
     return f"https://tonviewer.com/transfer/{address}?amount={amount_nano}&text={quote(comment)}"
 
 async def ton_get_transactions(address: str, limit: int = 20):
@@ -294,15 +292,24 @@ async def premium_watcher():
         await asyncio.sleep(15)
 
 # ---------- Inline keyboards ----------
-def premium_keyboard(deeplink_app: str, deeplink_web: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=deeplink_app)],
-            [InlineKeyboardButton(text="🌐 Pay via Web (Tonhub)", url=deeplink_web)],
-            [InlineKeyboardButton(text="🌐 Pay via Web (Tonviewer)", url=deeplink_web)],
-            [InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")],
-        ]
-    )
+#def premium_keyboard(deeplink_app: str, deeplink_web: str) -> InlineKeyboardMarkup:
+#    return InlineKeyboardMarkup(
+#        inline_keyboard=[
+#            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=deeplink_app)],
+#            [InlineKeyboardButton(text="🌐 Pay via Web (Tonhub)", url=deeplink_web)],
+#            [InlineKeyboardButton(text="🌐 Pay via Web (Tonviewer)", url=deeplink_web)],
+#            [InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")],
+#        ]
+#    )
+
+def premium_keyboard(link_app: str, link_hub: str | None = None, link_viewer: str | None = None) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text="🔗 Pay in TON (App)", url=link_app)]]
+    if link_hub:
+        rows.append([InlineKeyboardButton(text="🌐 Pay via Web (Tonhub)", url=link_hub)])
+    if link_viewer:
+        rows.append([InlineKeyboardButton(text="🌐 Pay via Web (Tonviewer)", url=link_viewer)])
+    rows.append([InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 # ---------- Handlers ----------
 @dp.message(CommandStart())
@@ -394,7 +401,6 @@ async def cmd_premium(msg: Message):
     code = f"BHEK-{uid}-{secrets.token_hex(2).upper()}"
 
     async with aiosqlite.connect(DB_PATH) as db:
-        # hindari penumpukan order pending
         await db.execute("DELETE FROM orders WHERE user_id=? AND status='PENDING'", (uid,))
         await db.execute(
             "INSERT INTO orders(user_id, code, amount_ton, created_at) VALUES (?,?,?,?)",
@@ -404,22 +410,22 @@ async def cmd_premium(msg: Message):
 
     logger.info("Order created uid=%s code=%s price=%.3f", uid, code, PREMIUM_PRICE_TON)
 
-    link_app = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
-    link_web = build_tonhub_link(TON_DEST, PREMIUM_PRICE_TON, code)
-    link_web = build_tonviewer_link(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_app    = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_hub    = build_tonhub_link(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_viewer = build_tonviewer_link(TON_DEST, PREMIUM_PRICE_TON, code)
 
-    await msg.answer(text, reply_markup=premium_keyboard(link_app, link_web))
     text = (
         "🌟 <b>Premium / Posisi Istimewa</b>\n\n"
         f"Harga: <b>{PREMIUM_PRICE_TON} TON</b> untuk {PREMIUM_DAYS} hari.\n"
         f"Alamat: <code>{TON_DEST}</code>\n"
         f"Komentar (WAJIB): <code>{code}</code>\n\n"
-        "1) Klik tombol <b>Pay in TON</b> (atau transfer manual)\n"
+        "1) Klik tombol <b>Pay in TON</b> (atau via web)\n"
         "2) Pastikan <b>comment</b> PERSIS sama\n"
         "3) Setelah bayar, tekan <b>Saya sudah transfer</b>\n\n"
         "Bot memverifikasi di blockchain dan otomatis mengaktifkan status Premium ✅"
     )
-    await msg.answer(text, reply_markup=premium_keyboard(link))
+
+    await msg.answer(text, reply_markup=premium_keyboard(link_app, link_hub, link_viewer))
 
 @dp.callback_query(F.data == "check_payment")
 async def cb_check_payment(cb):
