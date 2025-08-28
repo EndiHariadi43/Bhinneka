@@ -1,0 +1,17 @@
+name: Badge Heartbeat
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # tiap 15 menit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quick success
+        run: |
+          echo "OK"; sleep 3
