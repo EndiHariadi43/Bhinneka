@@ -1,6 +1,6 @@
 # bhinnekabot.py
 # BhinnekaBot — Unity in Diversity 🤝
-# Fitur: welcome + quest, premium via TON dengan verifikasi komentar unik on-chain.
+# Fitur: welcome + quest (daily claim), premium via TON dengan verifikasi komentar unik on-chain.
 
 import asyncio
 import os
@@ -33,7 +33,7 @@ PREMIUM_DAYS = int(os.getenv("PREMIUM_DAYS", "30"))
 # ==== KOMUNITAS & GRUP ====
 COMMUNITY_LINK = "https://t.me/bhinneka_coin"   # grup/channel komunitas
 X_LINK         = "https://x.com/bhinneka_coin"  # opsional
-COMMUNITY_CHAT_ID = "@bhinneka_coin"
+COMMUNITY_CHAT_ID = "@bhinneka_coin"            # pastikan bot adalah admin di grup ini
 
 assert BOT_TOKEN and TON_DEST, "Set BOT_TOKEN & TON_DEST_ADDRESS di env/secrets"
 
@@ -88,6 +88,14 @@ async def init_db():
                 status TEXT DEFAULT 'PENDING'
             );
 
+            -- Quest harian (UTC), satu klaim per user per hari
+            CREATE TABLE IF NOT EXISTS quests (
+                user_id INTEGER,
+                day TEXT,               -- YYYYMMDD (UTC)
+                claimed_at INTEGER,     -- epoch seconds UTC
+                PRIMARY KEY (user_id, day)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_orders_code ON orders(code);
             CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
             """
@@ -132,6 +140,30 @@ async def get_status(user_id: int):
             exp = datetime.fromtimestamp(until, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
             return f"🌟 Premium aktif hingga <b>{exp}</b>."
         return "🟢 Akun terdaftar. Premium: <b>Tidak aktif</b>."
+
+# ---------- Quest helpers ----------
+def _today_key_utc() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%d")
+
+async def has_claimed_today(user_id: int) -> bool:
+    day = _today_key_utc()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT 1 FROM quests WHERE user_id=? AND day=?", (user_id, day))
+        return await cur.fetchone() is not None
+
+async def record_claim(user_id: int) -> bool:
+    day = _today_key_utc()
+    now = int(time.time())
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT INTO quests(user_id, day, claimed_at) VALUES (?,?,?)",
+                (user_id, day, now),
+            )
+            await db.commit()
+        return True
+    except Exception:
+        return False  # kemungkinan sudah ada (PRIMARY KEY)
 
 # ---------- TON Helpers ----------
 def build_ton_deeplink(address: str, amount_ton: float, comment: str) -> str:
@@ -264,28 +296,59 @@ async def cmd_tasks(msg: Message):
 
 @dp.message(Command("claim"))
 async def cmd_claim(msg: Message):
+    uid = msg.from_user.id
     try:
-        member = await bot.get_chat_member(COMMUNITY_CHAT_ID, msg.from_user.id)
+        member = await bot.get_chat_member(COMMUNITY_CHAT_ID, uid)
         status_ok = member.status in {
             ChatMemberStatus.MEMBER,
             ChatMemberStatus.ADMINISTRATOR,
             ChatMemberStatus.CREATOR,
         }
-        if status_ok:
+        if not status_ok:
+            await msg.answer(
+                "❌ Kamu belum terdeteksi di grup. Silakan join via tombol di /tasks.",
+                reply_markup=MAIN_KB
+            )
+            return
+
+        # Sudah join → cek apakah sudah klaim hari ini
+        if await has_claimed_today(uid):
+            await msg.answer(
+                "ℹ️ Kamu sudah klaim quest hari ini. Datang lagi besok ya! ✨",
+                reply_markup=MAIN_KB
+            )
+            return
+
+        if await record_claim(uid):
             await msg.answer(
                 "✅ Klaim kamu dicatat. (Sistem reward akan diaktifkan setelah Premium). Terima kasih sudah join!",
                 reply_markup=MAIN_KB
             )
         else:
             await msg.answer(
-                "❌ Kamu belum terdeteksi di grup. Silakan join via tombol di /tasks.",
+                "ℹ️ Terlihat kamu sudah klaim hari ini. Sampai jumpa besok! 👋",
                 reply_markup=MAIN_KB
             )
+
     except Exception:
         await msg.answer(
             "⚠️ Tidak bisa memverifikasi. Pastikan bot sudah ada di grup dan coba lagi.",
             reply_markup=MAIN_KB
         )
+
+@dp.message(Command("queststatus"))
+async def cmd_queststatus(msg: Message):
+    uid = msg.from_user.id
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT COUNT(*) FROM quests WHERE user_id=?", (uid,))
+        total, = await cur.fetchone()
+    today_done = await has_claimed_today(uid)
+    txt = (
+        "📊 <b>Status Quest</b>\n"
+        f"• Total hari berhasil klaim: <b>{total}</b>\n"
+        f"• Hari ini: {'✅ sudah' if today_done else '❌ belum'}"
+    )
+    await msg.answer(txt, reply_markup=MAIN_KB)
 
 @dp.message(Command("premium"))
 async def cmd_premium(msg: Message):
@@ -351,6 +414,7 @@ async def cmd_help(msg: Message):
         "/start — Welcome & menu\n"
         "/tasks — Quest harian\n"
         "/claim — Klaim quest (demo)\n"
+        "/queststatus — Lihat progres quest\n"
         "/premium — Beli Premium via TON\n"
         "/status — Cek status Premium\n"
         "/help — Panduan semua command",
@@ -367,6 +431,7 @@ async def main():
         BotCommand(command="start", description="Welcome + menu"),
         BotCommand(command="tasks", description="Quest harian"),
         BotCommand(command="claim", description="Klaim quest (demo)"),
+        BotCommand(command="queststatus", description="Lihat progres quest"),
         BotCommand(command="premium", description="Beli Premium via TON"),
         BotCommand(command="status", description="Cek status Premium"),
         BotCommand(command="help", description="Bantuan"),
