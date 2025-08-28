@@ -38,5 +38,6 @@ python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 export BOT_TOKEN=xxx
 export TON_DEST_ADDRESS=UQC...           # your TON wallet
+```
 python bhinnekabot.py
 ```
