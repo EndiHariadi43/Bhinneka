@@ -315,9 +315,15 @@ def premium_keyboard(link_app: str, link_tonhub: str, link_tgwallet: str, link_e
 @dp.message(CommandStart())
 async def cmd_start(msg: Message):
     logger.info("START from uid=%s username=%s", msg.from_user.id, msg.from_user.username)
+
+    # Tambahan: log explicit bahwa command /start diterima
+    logger.info(">>> /start command diterima dan sedang diproses...")
+
     await upsert_user(msg)
     await msg.answer(WELCOME_TEXT, reply_markup=MAIN_KB)
-    logger.info("START replied to uid=%s", msg.from_user.id)
+
+    # Tambahan: log explicit bahwa balasan sudah dikirim
+    logger.info(">>> /start balasan berhasil dikirim ke uid=%s", msg.from_user.id)
 
 @dp.message(Command("tasks"))
 async def cmd_tasks(msg: Message):
@@ -476,19 +482,6 @@ async def cmd_help(msg: Message):
         "/help — Panduan semua command",
         reply_markup=MAIN_KB
     )
-
-@dp.message(CommandStart())
-async def cmd_start(msg: Message):
-    logger.info("START from uid=%s username=%s", msg.from_user.id, msg.from_user.username)
-
-    # Tambahan: log explicit bahwa command /start diterima
-    logger.info(">>> /start command diterima dan sedang diproses...")
-
-    await upsert_user(msg)
-    await msg.answer(WELCOME_TEXT, reply_markup=MAIN_KB)
-
-    # Tambahan: log explicit bahwa balasan sudah dikirim
-    logger.info(">>> /start balasan berhasil dikirim ke uid=%s", msg.from_user.id)
     
 # ---------- Main ----------
 async def main():
