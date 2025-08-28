@@ -310,7 +310,7 @@ async def cmd_premium(msg: Message):
     )
     await msg.answer(text, reply_markup=premium_keyboard(link))
 
-@dp.callback_query(F.data == "check_payment"))
+@dp.callback_query(F.data == "check_payment")
 async def cb_check_payment(cb):
     uid = cb.from_user.id
     async with aiosqlite.connect(DB_PATH) as db:
