@@ -183,6 +183,18 @@ def build_ton_deeplink(address: str, amount_ton: float, comment: str) -> str:
     from urllib.parse import quote
     return f"ton://transfer/{address}?amount={amount_nano}&text={quote(comment)}"
 
+def build_tonhub_link(address: str, amount_ton: float, comment: str) -> str:
+    """
+    Alternatif web: buka halaman Tonhub agar user tanpa handler ton://
+    tetap bisa membayar dari browser.
+    """
+    from urllib.parse import quote
+    amount_nano = int(amount_ton * 1_000_000_000)
+    # tonhub & tonviewer keduanya support query: amount (nano) + text (comment)
+    return f"https://tonhub.com/transfer/{address}?amount={amount_nano}&text={quote(comment)}"
+    # opsi lain (sama saja)
+    return f"https://tonviewer.com/transfer/{address}?amount={amount_nano}&text={quote(comment)}"
+
 async def ton_get_transactions(address: str, limit: int = 20):
     params = {"address": address, "limit": limit}
     headers = {}
@@ -282,10 +294,12 @@ async def premium_watcher():
         await asyncio.sleep(15)
 
 # ---------- Inline keyboards ----------
-def premium_keyboard(deeplink: str) -> InlineKeyboardMarkup:
+def premium_keyboard(deeplink_app: str, deeplink_web: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=deeplink)],
+            [InlineKeyboardButton(text="🔗 Pay in TON (App)", url=deeplink_app)],
+            [InlineKeyboardButton(text="🌐 Pay via Web (Tonhub)", url=deeplink_web)],
+            [InlineKeyboardButton(text="🌐 Pay via Web (Tonviewer)", url=deeplink_web)],
             [InlineKeyboardButton(text="✅ Saya sudah transfer", callback_data="check_payment")],
         ]
     )
@@ -390,7 +404,11 @@ async def cmd_premium(msg: Message):
 
     logger.info("Order created uid=%s code=%s price=%.3f", uid, code, PREMIUM_PRICE_TON)
 
-    link = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_app = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_web = build_tonhub_link(TON_DEST, PREMIUM_PRICE_TON, code)
+    link_web = build_tonviewer_link(TON_DEST, PREMIUM_PRICE_TON, code)
+
+    await msg.answer(text, reply_markup=premium_keyboard(link_app, link_web))
     text = (
         "🌟 <b>Premium / Posisi Istimewa</b>\n\n"
         f"Harga: <b>{PREMIUM_PRICE_TON} TON</b> untuk {PREMIUM_DAYS} hari.\n"
@@ -455,7 +473,7 @@ async def main():
     await bot.set_my_commands([
         BotCommand(command="start", description="Welcome + menu"),
         BotCommand(command="tasks", description="Quest harian"),
-        BotCommand(command="claim", description="Klaim quest (demo)"),
+        BotCommand(command="claim", description="Klaim quest"),
         BotCommand(command="queststatus", description="Lihat progres quest"),
         BotCommand(command="points", description="Lihat total poin"),
         BotCommand(command="premium", description="Beli Premium via TON"),
