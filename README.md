@@ -1,4 +1,5 @@
-[![Build](https://github.com/EndiHariadi43/Bhinneka/actions/workflows/bhinnekabot.yml/badge.svg?branch=main)](https://github.com/EndiHariadi43/Bhinneka/actions/workflows/bhinnekabot.yml)
+[![Build](https://github.com/EndiHariadi43/Bhinneka/actions/workflows/badge.yml/badge.svg?branch=main)](https://github.com/EndiHariadi43/Bhinneka/actions/workflows/badge.yml)
+[![Bot](https://github.com/EndiHariadi43/Bhinneka/actions/workflows/bhinnekabot.yml/badge.svg?branch=main)](https://github.com/EndiHariadi43/Bhinneka/actions/workflows/bhinnekabot.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-@BHEK_bot-26A5E4?logo=telegram&logoColor=white)](https://t.me/BHEK_bot)
 
