@@ -80,8 +80,16 @@ jobs:
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
-          timeout 345m python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log
-          echo "python exit code: ${PIPESTATUS[0]}"
+          # Jalankan dengan timeout; simpan exit code proses python (bukan tee)
+          ( timeout 345m python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log ); ec=${PIPESTATUS[0]}
+          echo "python exit code: $ec"
+          # 124 = timeout -> anggap sukses (rotasi terjadwal)
+          if [ "$ec" = "124" ]; then
+            echo "Rotation timeout reached — treating as success."
+            exit 0
+          fi
+          # Kode lain = error -> fail job
+          exit "$ec"
 
       # upload DB + LOG setiap kali run (berhasil/gagal)
       - name: Upload artifacts (DB + logs)
