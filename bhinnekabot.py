@@ -1,6 +1,6 @@
 # bhinnekabot.py
 # BhinnekaBot — Unity in Diversity 🤝
-# Fitur: welcome + quest (daily claim), premium via TON dengan verifikasi komentar unik on-chain.
+# Fitur: welcome + quest (daily claim + points), premium via TON dengan verifikasi komentar unik on-chain.
 
 import asyncio
 import os
@@ -75,7 +75,8 @@ async def init_db():
                 first_name TEXT,
                 joined_at INTEGER,
                 premium_until INTEGER DEFAULT 0,
-                ref_by INTEGER
+                ref_by INTEGER,
+                points INTEGER DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS orders (
@@ -141,7 +142,7 @@ async def get_status(user_id: int):
             return f"🌟 Premium aktif hingga <b>{exp}</b>."
         return "🟢 Akun terdaftar. Premium: <b>Tidak aktif</b>."
 
-# ---------- Quest helpers ----------
+# ---------- Quest & Points helpers ----------
 def _today_key_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d")
 
@@ -164,6 +165,17 @@ async def record_claim(user_id: int) -> bool:
         return True
     except Exception:
         return False  # kemungkinan sudah ada (PRIMARY KEY)
+
+async def add_points(user_id: int, amount: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET points = COALESCE(points,0) + ? WHERE user_id=?", (amount, user_id))
+        await db.commit()
+
+async def get_points(user_id: int) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
+        row = await cur.fetchone()
+        return row[0] if row and row[0] else 0
 
 # ---------- TON Helpers ----------
 def build_ton_deeplink(address: str, amount_ton: float, comment: str) -> str:
@@ -302,7 +314,9 @@ async def cmd_claim(msg: Message):
         status_ok = member.status in {
             ChatMemberStatus.MEMBER,
             ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.CREATOR,
+            # beberapa versi aiogram menggunakan OWNER, sebagian CREATOR
+            getattr(ChatMemberStatus, "CREATOR", ChatMemberStatus.ADMINISTRATOR),
+            getattr(ChatMemberStatus, "OWNER", ChatMemberStatus.ADMINISTRATOR),
         }
         if not status_ok:
             await msg.answer(
@@ -320,8 +334,13 @@ async def cmd_claim(msg: Message):
             return
 
         if await record_claim(uid):
+            # reward poin
+            await add_points(uid, 10)
+            pts = await get_points(uid)
             await msg.answer(
-                "✅ Klaim kamu dicatat. (Sistem reward akan diaktifkan setelah Premium). Terima kasih sudah join!",
+                f"✅ Klaim kamu dicatat. (+10 poin)\n"
+                f"Saat ini total poinmu: <b>{pts}</b>\n\n"
+                f"(Sistem reward penuh akan diaktifkan setelah Premium).",
                 reply_markup=MAIN_KB
             )
         else:
@@ -349,6 +368,11 @@ async def cmd_queststatus(msg: Message):
         f"• Hari ini: {'✅ sudah' if today_done else '❌ belum'}"
     )
     await msg.answer(txt, reply_markup=MAIN_KB)
+
+@dp.message(Command("points"))
+async def cmd_points(msg: Message):
+    pts = await get_points(msg.from_user.id)
+    await msg.answer(f"🏅 Total poin kamu: <b>{pts}</b>", reply_markup=MAIN_KB)
 
 @dp.message(Command("premium"))
 async def cmd_premium(msg: Message):
@@ -379,7 +403,7 @@ async def cmd_premium(msg: Message):
     )
     await msg.answer(text, reply_markup=premium_keyboard(link))
 
-@dp.callback_query(F.data == "check_payment")
+@dp.callback_query(F.data == "check_payment"))
 async def cb_check_payment(cb):
     uid = cb.from_user.id
     async with aiosqlite.connect(DB_PATH) as db:
@@ -415,6 +439,7 @@ async def cmd_help(msg: Message):
         "/tasks — Quest harian\n"
         "/claim — Klaim quest (demo)\n"
         "/queststatus — Lihat progres quest\n"
+        "/points — Lihat total poin\n"
         "/premium — Beli Premium via TON\n"
         "/status — Cek status Premium\n"
         "/help — Panduan semua command",
@@ -432,6 +457,7 @@ async def main():
         BotCommand(command="tasks", description="Quest harian"),
         BotCommand(command="claim", description="Klaim quest (demo)"),
         BotCommand(command="queststatus", description="Lihat progres quest"),
+        BotCommand(command="points", description="Lihat total poin"),
         BotCommand(command="premium", description="Beli Premium via TON"),
         BotCommand(command="status", description="Cek status Premium"),
         BotCommand(command="help", description="Bantuan"),
