@@ -1,4 +1,4 @@
-Contributing
+**Contributing**
 
 Thank you for your interest in contributing to Bhinneka (BHEK)!
 We welcome all contributions — whether it's code, documentation, bug reports, or feature ideas.
