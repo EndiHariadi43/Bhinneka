@@ -1,24 +1,24 @@
 ---
 name: Feature request
-about: Ajukan ide/fitur baru
+about: Suggest a new idea or feature
 title: "[Feature] "
 labels: enhancement
 assignees: ""
 ---
 
-**Masalah/tujuan**
-Apa masalah yang ingin diselesaikan atau tujuan fitur?
+**Problem / Goal**  
+What problem are you trying to solve, or what is the goal of this feature?
 
-**Solusi yang diusulkan**
-Jelaskan rancangan/ide utama.
+**Proposed Solution**  
+Describe the main idea or design for the feature.
 
-**Alternatif yang dipertimbangkan**
-Opsi lain yang pernah dipikirkan.
+**Alternatives Considered**  
+List any alternative solutions or approaches you have thought about.
 
-**Dampak**
-Dampak ke pengguna, kinerja, keamanan, DX.
+**Impact**  
+Explain the impact on users, performance, security, or developer experience (DX).
 
 **Checklist**
-- [ ] Backward compatible
-- [ ] Perlu dokumen di README
-- [ ] Perlu env/secret baru (jika ya, sebutkan)
+- [ ] Backward compatible  
+- [ ] Requires documentation update in README  
+- [ ] Requires new env/secret variables (if yes, specify)
