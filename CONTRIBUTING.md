@@ -10,10 +10,12 @@ We welcome all contributions — whether it's code, documentation, bug reports, 
 
 1. Fork this repository
 2. Create a feature branch:
-```bash git checkout -b feat/your-feature-name ```
-3. Make your changes & commit using conventional messages
-4. Run lint/tests locally if applicable
-5. Open a Pull Request to main (explain the changes & reasoning)
+```
+git checkout -b feat/your-feature-name
+```
+4. Make your changes & commit using conventional messages
+5. Run lint/tests locally if applicable
+6. Open a Pull Request to main (explain the changes & reasoning)
 
 ---
 
@@ -36,7 +38,7 @@ docs: ... → for documentation updates
 chore: ... → for non-code changes (CI/CD, config, build, etc.)
 
 Examples:
-```bash
+```
 feat: add /points command to Telegram bot
 fix: resolve DB initialization error on first run
 docs: update README with Quick Start
