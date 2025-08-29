@@ -12,19 +12,19 @@ This repo contains:
 
 ---
 
-## 🌏 Filosofi Bhinneka Tunggal Ika
+## 🌏 The Philosophy of Unity in Diversity (Bhinneka Tunggal Ika) 
 
-> *“Bhinneka Tunggal Ika”* berasal dari kitab Sutasoma karya Mpu Tantular (abad ke-14),  
-> yang berarti **“Berbeda-beda tetapi tetap satu jua”**.  
+> *“Bhinneka Tunggal Ika”* comes from the 14th century *Sutasoma* manuscript by Mpu Tantular,  
+> meaning **“They are many, yet they are one.”**  
 
-Filosofi ini menjadi dasar persatuan bangsa Indonesia, menekankan bahwa keragaman suku, bahasa, budaya, dan keyakinan bisa disatukan dalam harmoni.  
+This philosophy became Indonesia’s national motto, symbolizing unity among diverse ethnicities, languages, cultures, and beliefs.  
 
-BHEK mengadopsi nilai ini dalam dunia crypto:  
-- Menghubungkan komunitas global yang beragam.  
-- Menyatukan tujuan bersama melalui **transparansi**, **keadilan**, dan **kebersamaan**.  
-- Menciptakan ekosistem komunitas yang kuat dan berkelanjutan.  
+BHEK adopts this timeless wisdom into the crypto world:  
+- Connecting diverse communities across the globe.  
+- Uniting people under **fairness**, **transparency**, and **collective growth**.  
+- Building a sustainable ecosystem that thrives on cooperation.  
 
-Dengan semangat *Unity in Diversity*, BHEK bukan sekadar meme coin, tetapi juga simbol kolaborasi lintas batas. 🚀
+With the spirit of *Unity in Diversity*, BHEK is not just a meme coin, but a **symbol of collaboration without borders**. 🚀  
 
 ---
 
