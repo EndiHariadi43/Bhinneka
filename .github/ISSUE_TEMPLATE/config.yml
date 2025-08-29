@@ -4,3 +4,7 @@ contact_links:
   - name: 🔒 Security reports
     url: mailto:endi.linux.mint@gmail.com
     about: Please report security vulnerabilities privately via email. Do not open a public issue.
+
+  - name: 💬 Ideas & Questions
+    url: https://github.com/EndiHariadi43/Bhinneka/discussions
+    about: For general ideas, Q&A, or open discussions that are not bugs or feature requests.
