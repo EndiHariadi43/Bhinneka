@@ -6,7 +6,7 @@ We welcome all contributions — whether it's code, documentation, bug reports, 
 
 ---
 
-🚀 Quick Workflow
+## 🚀 Quick Workflow
 
 1. Fork this repository
 2. Create a feature branch:
@@ -19,7 +19,7 @@ git checkout -b feat/your-feature-name
 
 ---
 
-💐 Code Guidelines
+## 💐 Code Guidelines
 
 Python >= 3.11 (as used in GitHub Actions workflows)
 Follow PEP8 style guidelines where practical
@@ -28,7 +28,7 @@ Keep code consistent with existing structure
 
 ---
 
-🩻 Commit Messages
+## 🩻 Commit Messages
 
 Use short, consistent prefixes:
 
@@ -46,7 +46,7 @@ docs: update README with Quick Start
 
 ---
 
-🐛 Issues & Pull Requests
+## 🐛 Issues & Pull Requests
 
 - Use issue/PR templates (if provided)
 - For bugs, include clear reproduction steps
@@ -55,12 +55,24 @@ docs: update README with Quick Start
 
 ---
 
-✅ Pre-Pull Request Checklist
+## ✅ Pre-Pull Request Checklist
 
-* [ ] Code has been linted (```black```, ```isort```, or ```chosen tools```)
-* [ ] No secrets or sensitive files are committed
-* [ ] Changes were tested locally and work as expected
-* [ ] PR description is clear and complete
+- [ ] Code has been linted (`black`, `isort`, or chosen tools)
+- [ ] No secrets or sensitive files are committed
+- [ ] Changes were tested locally and work as expected
+- [ ] PR description is clear and complete
+
+## 📝 Summary
+
+Explain what this PR does and why it’s needed.
+
+## 📸 Screenshots (if applicable)
+
+(Add before/after screenshots for UI changes)
+
+## 🔗 Related Issues
+
+Closes #ISSUE_ID
 
 ---
 
