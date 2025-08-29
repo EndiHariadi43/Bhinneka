@@ -21,10 +21,10 @@ git checkout -b feat/your-feature-name
 
 ## 💐 Code Guidelines
 
-Python >= 3.11 (as used in GitHub Actions workflows)
-Follow PEP8 style guidelines where practical
-Do not commit secrets (.env, tokens, API keys, etc.)
-Keep code consistent with existing structure
+- Python >= 3.11 (as used in GitHub Actions workflows)
+- Follow PEP8 style guidelines where practical
+- Do not commit secrets (.env, tokens, API keys, etc.)
+- Keep code consistent with existing structure
 
 ---
 
