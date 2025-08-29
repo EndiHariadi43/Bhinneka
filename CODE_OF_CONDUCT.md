@@ -1,22 +1,22 @@
-# Code of Conduct (Contributor Covenant – singkat)
+# Code of Conduct (Contributor Covenant – Short Form)
 
-Kami berkomitmen menciptakan komunitas yang ramah, inklusif, dan saling menghormati.
+We are committed to creating a welcoming, inclusive, and respectful community.
 
-## Harapan Perilaku
-- Bersikap sopan, inklusif, tidak diskriminatif
-- Terima umpan balik secara konstruktif
-- Fokus pada solusi dan kolaborasi
+## Expected Behavior
+- Act with courtesy, inclusiveness, and without discrimination  
+- Accept and provide feedback constructively  
+- Focus on solutions and collaboration  
 
-## Perilaku Tidak Diterima
-- Pelecehan, hinaan, atau serangan personal
-- Publikasi informasi pribadi tanpa izin
-- Gangguan berkepanjangan pada diskusi/proyek
+## Unacceptable Behavior
+- Harassment, insults, or personal attacks  
+- Sharing private information without consent  
+- Sustained disruption of discussions or project activities  
 
-## Lingkup
-Kebijakan ini berlaku di seluruh ruang proyek (repo, issues, PR, diskusi, komunitas).
+## Scope
+This policy applies to all project spaces (repositories, issues, pull requests, discussions, and community channels).  
 
-## Penegakan
-Laporkan pelanggaran ke **conduct@bhinneka.org** (ganti emailmu).  
-Tim maintainer akan meninjau dan mengambil tindakan yang sesuai (peringatan, pembatasan partisipasi, hingga pemblokiran).
+## Enforcement
+Report violations to **conduct@bhinneka.org** (replace with your actual contact email).  
+The maintainer team will review reports and take appropriate action (warnings, participation restrictions, or banning).  
 
-Diadaptasi dari [Contributor Covenant](https://www.contributor-covenant.org/) v2.x.
+Adapted from the [Contributor Covenant](https://www.contributor-covenant.org/) v2.x.
