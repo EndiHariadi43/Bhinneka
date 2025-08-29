@@ -60,14 +60,14 @@ jobs:
         run: |
           if [ ! -f bhinneka.db ]; then
             python - <<'PY'
-          import sqlite3
-          con = sqlite3.connect('bhinneka.db')
-          con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
-          con.commit()
-          con.close()
-          PY
-              fi
-              ls -l bhinneka.db
+            import sqlite3
+            con = sqlite3.connect('bhinneka.db')
+            con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
+            con.commit()
+            con.close()
+            PY
+          fi
+          ls -l bhinneka.db
 
       - name: Run bot (with logs, 345m timeout)
         env:
@@ -79,17 +79,22 @@ jobs:
           PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
           PYTHONUNBUFFERED: "1"
         run: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Starting BhinnekaBot..."
-          # keep bot alive ~345 minutes (just under 6 hours)
+
+          # Jalankan dengan timeout; jangan hentikan skrip saat exit!=0 agar bisa cek kode 124
+          set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
+          set -e
+
           echo "exit code: $ec"
-          # 124 = timeout reached → success (rotation)
+          # 124 = timeout -> anggap sukses (rotasi terjadwal)
           if [ "$ec" -eq 124 ]; then
             echo "Rotation timeout reached — treating as success."
             exit 0
           fi
+          # Kode lain = error -> fail job
           exit "$ec"
 
       - name: Upload artifacts (DB + logs)
