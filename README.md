@@ -24,13 +24,13 @@ BHEK adopts this timeless wisdom into the crypto world:
 - Uniting people under **fairness**, **transparency**, and **collective growth**.  
 - Building a sustainable ecosystem that thrives on cooperation.  
 
-With the spirit of *Unity in Diversity*, BHEK is not just a meme coin, but a **symbol of collaboration without borders**. 🚀  
+With the spirit of *Unity in Diversity*, $BHEK is not just a meme coin, but a **symbol of collaboration without borders**. 🚀  
 
 ---
 
 ## 🚀 Earn Passive Income with Referrals
 
-We believe in **community empowerment** — and now you can be rewarded simply by sharing Bhinneka (BHEK) with your friends!
+We believe in **community empowerment** — and now you can be rewarded simply by sharing Bhinneka ($BHEK) with your friends!
 
 ✨ **How it works**:  
 1. Share your **special referral link** below.  
