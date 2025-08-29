@@ -64,7 +64,7 @@ TASKS = [
 MAIN_KB = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="👥 Join Telegram", url=COMMUNITY_LINK)],
-        [InlineKeyboardButton(text="🐦 Follow X", url=X_LINK)],
+        [InlineKeyboardButton(text="🐦 @Bhinneka_coin", url=X_LINK)],
     ]
 )
 
@@ -323,10 +323,9 @@ async def cmd_ping(msg: Message):
 async def cmd_tasks(msg: Message):
     lines = ["📋 <b>Quest Harian</b>"]
     lines.append(f'1) Join komunitas Telegram: <a href="{COMMUNITY_LINK}">@bhinneka_coin</a>')
-    lines.append(f'2) Follow X (Twitter): <a href="https://x.com/bhinneka_coin">@Bhinneka_coin</a>')
+    lines.append('2) Follow X (Twitter): <a href="https://x.com/bhinneka_coin">@Bhinneka_coin</a>')
     lines.append('3) Retweet pinned post (X) & mention <b>#BHEK</b>')
     lines.append("\nKetik <code>/claim</code> setelah selesai.")
-
     await msg.answer("\n".join(lines), reply_markup=MAIN_KB)
 
 @r.message(Command("claim"))
