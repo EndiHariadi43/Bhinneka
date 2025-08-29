@@ -46,12 +46,13 @@ docs: update README with Quick Start
 
 ---
 
-## 🐛 Issues & Pull Requests
+## ## 🐛 Issues & Pull Requests
 
 - Use issue/PR templates (if provided)
 - For bugs, include clear reproduction steps
 - For features, describe the use case and benefits
 - Keep PRs focused on one topic for easier review
+- Follow the [Pull Request Template](.github/pull_request_template.md) when submitting PRs
 
 ---
 
