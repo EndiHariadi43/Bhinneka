@@ -60,12 +60,12 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-import sqlite3
-con = sqlite3.connect('bhinneka.db')
-con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
-con.commit()
-con.close()
-PY
+         import sqlite3
+         con = sqlite3.connect('bhinneka.db')
+         con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
+         con.commit()
+         con.close()
+         PY
           ls -l bhinneka.db
 
       - name: Run bot (with logs, 345m timeout)
