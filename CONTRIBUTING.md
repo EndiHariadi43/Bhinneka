@@ -1,23 +1,98 @@
-# Contributing
+Contributing
 
-Terima kasih ingin berkontribusi!
+Thank you for your interest in contributing to Bhinneka (BHEK)!
+We welcome all contributions — whether it's code, documentation, bug reports, or feature ideas.
 
-## Alur Singkat
-1. Fork repo ini
-2. Buat branch fitur: `git checkout -b feat/nama-fitur`
-3. Commit sesuai konvensi singkat
-4. Jalankan lint/test lokal bila perlu
-5. Buat Pull Request ke `main` (jelaskan perubahan & alasan)
 
-## Pedoman Kode
-- Python >= 3.11
-- Ikuti gaya PEP8 seperlunya
-- Pastikan rahasia tidak ikut ter-commit
+---
 
-## Commit Message
-Gunakan pola ringkas:
-- `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`
+🚀 Quick Workflow
 
-## Issues & PR
-- Gunakan template yang tersedia
-- Sertakan langkah reproduksi atau contoh pemakaian
+1. Fork this repository
+
+
+2. Create a feature branch:
+
+git checkout -b feat/your-feature-name
+
+
+3. Make your changes & commit using conventional messages
+
+
+4. Run lint/tests locally if applicable
+
+
+5. Open a Pull Request to main (explain the changes & reasoning)
+
+
+
+
+---
+
+💐 Code Guidelines
+
+Python >= 3.11 (as used in GitHub Actions workflows)
+
+Follow PEP8 style guidelines where practical
+
+Do not commit secrets (.env, tokens, API keys, etc.)
+
+Keep code consistent with existing structure
+
+
+
+---
+
+🩻 Commit Messages
+
+Use short, consistent prefixes:
+
+feat: ... → for new features
+
+fix: ... → for bug fixes
+
+docs: ... → for documentation updates
+
+chore: ... → for non-code changes (CI/CD, config, build, etc.)
+
+
+Examples:
+
+feat: add /points command to Telegram bot
+fix: resolve DB initialization error on first run
+docs: update README with Quick Start
+
+
+---
+
+🐛 Issues & Pull Requests
+
+Use issue/PR templates (if provided)
+
+For bugs, include clear reproduction steps
+
+For features, describe the use case and benefits
+
+Keep PRs focused on one topic for easier review
+
+
+
+---
+
+✅ Pre-Pull Request Checklist
+
+[ ] Code has been linted (black, isort, or chosen tools)
+
+[ ] No secrets or sensitive files are committed
+
+[ ] Changes were tested locally and work as expected
+
+[ ] PR description is clear and complete
+
+
+
+---
+
+By following these guidelines, your contributions can be reviewed and merged faster, helping the community grow stronger.
+Thank you 🙏
+
