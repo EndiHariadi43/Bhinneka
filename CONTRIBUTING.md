@@ -32,10 +32,10 @@ Keep code consistent with existing structure
 
 Use short, consistent prefixes:
 
-feat: ... → for new features
-fix: ... → for bug fixes
-docs: ... → for documentation updates
-chore: ... → for non-code changes (CI/CD, config, build, etc.)
+- feat: ... → for new features
+- fix: ... → for bug fixes
+- docs: ... → for documentation updates
+- chore: ... → for non-code changes (CI/CD, config, build, etc.)
 
 Examples:
 ```
