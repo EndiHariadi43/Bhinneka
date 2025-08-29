@@ -14,7 +14,7 @@ This repo contains:
 
 ## 🌏 The Philosophy of Unity in Diversity
 
-> *“Unity in Diversity”* comes from the 14th century *Sutasoma* manuscript by Mpu Tantular,  
+> *“Unity in Diversity” (Bhinneka Tunggal Ika)* comes from the 14th century *Sutasoma* manuscript by Mpu Tantular,  
 > meaning **“They are many, yet they are one.”**  
 
 This philosophy became Indonesia’s national motto, symbolizing unity among diverse ethnicities, languages, cultures, and beliefs.  
