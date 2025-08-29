@@ -1,30 +1,30 @@
 ---
 name: Bug report
-about: Laporkan bug agar kami bisa memperbaiki
+about: Report a bug to help us improve
 title: "[Bug] "
 labels: bug
 assignees: ""
 ---
 
-**Deskripsi bug**
-Jelaskan bug secara singkat & jelas.
+**Bug Description**  
+Provide a clear and concise description of the bug.
 
-**Cara reproduksi**
-1. Langkah 1
-2. Langkah 2
-3. Hasil yang terlihat
+**Steps to Reproduce**  
+1. Step 1  
+2. Step 2  
+3. See the unexpected behavior  
 
-**Perilaku yang diharapkan**
-Jelaskan perilaku yang seharusnya.
+**Expected Behavior**  
+Describe what you expected to happen.
 
-**Screenshot/log**
-Lampirkan jika ada.
+**Screenshots / Logs**  
+If applicable, attach screenshots or logs to help explain the issue.
 
-**Lingkungan**
-- OS:
-- Python:
-- Cara menjalankan (local/GitHub Actions):
-- Versi commit/branch:
+**Environment**  
+- OS:  
+- Python version:  
+- Execution method (local / GitHub Actions):  
+- Commit hash / branch:  
 
-**Info tambahan**
-Tambahan konteks lain.
+**Additional Context**  
+Add any other context about the problem here.
