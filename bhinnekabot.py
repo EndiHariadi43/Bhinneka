@@ -322,9 +322,11 @@ async def cmd_ping(msg: Message):
 @r.message(Command("tasks"))
 async def cmd_tasks(msg: Message):
     lines = ["📋 <b>Quest Harian</b>"]
-    for i, t in enumerate(TASKS, 1):
-        lines.append(f"{i}. {t}")
+    lines.append(f'1) Join komunitas Telegram: <a href="{COMMUNITY_LINK}">@bhinneka_coin</a>')
+    lines.append(f'2) Follow X (Twitter): <a href="https://x.com/bhinneka_coin">@Bhinneka_coin</a>')
+    lines.append('3) Retweet pinned post (X) & mention <b>#BHEK</b>')
     lines.append("\nKetik <code>/claim</code> setelah selesai.")
+
     await msg.answer("\n".join(lines), reply_markup=MAIN_KB)
 
 @r.message(Command("claim"))
