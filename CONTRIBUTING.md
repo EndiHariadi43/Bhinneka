@@ -48,19 +48,22 @@ docs: update README with Quick Start
 
 🐛 Issues & Pull Requests
 
-Use issue/PR templates (if provided)
-For bugs, include clear reproduction steps
-For features, describe the use case and benefits
-Keep PRs focused on one topic for easier review
+• Use issue/PR templates (if provided)
+• For bugs, include clear reproduction steps
+• For features, describe the use case and benefits
+• Keep PRs focused on one topic for easier review
 
 ---
 
 ✅ Pre-Pull Request Checklist
 
-* [ ] Code has been linted (black, isort, or chosen tools)
-* [ ] No secrets or sensitive files are committed
-* [ ] Changes were tested locally and work as expected
-* [ ] PR description is clear and complete
+[ ] Code has been linted (```black```, ```isort```, or ```chosen tools```)
+
+[ ] No secrets or sensitive files are committed
+
+[ ] Changes were tested locally and work as expected
+
+[ ] PR description is clear and complete
 
 ---
 
