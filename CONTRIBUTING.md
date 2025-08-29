@@ -63,18 +63,6 @@ docs: update README with Quick Start
 - [ ] Changes were tested locally and work as expected
 - [ ] PR description is clear and complete
 
-## 📝 Summary
-
-Explain what this PR does and why it’s needed.
-
-## 📸 Screenshots (if applicable)
-
-(Add before/after screenshots for UI changes)
-
-## 🔗 Related Issues
-
-Closes #ISSUE_ID
-
 ---
 
 By following these guidelines, your contributions can be reviewed and merged faster, helping the community grow stronger.
