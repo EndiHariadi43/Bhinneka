@@ -6,7 +6,7 @@ Kami sangat menghargai laporan kerentanan.
 Kami aktif merawat branch `main` dan rilis terbaru.
 
 ## Reporting a Vulnerability
-Laporkan secara privat ke **security@bhinneka.org** (ganti dengan emailmu).
+Laporkan secara privat ke **endilinuxmint@gmail.com**.
 Sertakan:
 - Deskripsi singkat & dampak
 - Langkah reproduksi
