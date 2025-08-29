@@ -2,7 +2,7 @@ name: BhinnekaBot (TON Premium)
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # every 6 hours (UTC)
+    - cron: "0 */6 * * *"     # every 6 hours
   workflow_dispatch:
 
 permissions:
@@ -59,13 +59,7 @@ jobs:
       - name: Ensure DB file exists (first run safety)
         run: |
           set -euo pipefail
-          python - <<'PY'
-         import sqlite3
-         con = sqlite3.connect('bhinneka.db')
-         con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
-         con.commit()
-         con.close()
-         PY
+          python -c "import sqlite3; con=sqlite3.connect('bhinneka.db'); con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)'); con.commit(); con.close()"
           ls -l bhinneka.db
 
       - name: Run bot (with logs, 345m timeout)
@@ -78,10 +72,10 @@ jobs:
           PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
           PYTHONUNBUFFERED: "1"
         run: |
-          set -uo pipefail
+          set -euo pipefail
           echo "Starting BhinnekaBot..."
 
-          # Jalankan dengan timeout; tahan exit agar bisa cek kode 124
+          # Jalankan dengan timeout; jangan hentikan skrip saat exit!=0 agar bisa cek kode 124
           set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
