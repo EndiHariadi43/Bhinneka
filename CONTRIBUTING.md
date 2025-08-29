@@ -57,10 +57,10 @@ Keep PRs focused on one topic for easier review
 
 ✅ Pre-Pull Request Checklist
 
-[ ] Code has been linted (black, isort, or chosen tools)
-[ ] No secrets or sensitive files are committed
-[ ] Changes were tested locally and work as expected
-[ ] PR description is clear and complete
+* [ ] Code has been linted (black, isort, or chosen tools)
+* [ ] No secrets or sensitive files are committed
+* [ ] Changes were tested locally and work as expected
+* [ ] PR description is clear and complete
 
 ---
 
