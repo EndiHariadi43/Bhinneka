@@ -1,6 +1,5 @@
 # bhinnekabot.py
 # BhinnekaBot — Unity in Diversity 🤝
-# Fitur: welcome + quest (daily claim + points), premium via TON dengan verifikasi komentar unik on-chain.
 
 import asyncio
 import os
@@ -11,9 +10,11 @@ from datetime import datetime, timedelta, timezone
 
 import aiosqlite
 import httpx
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
+from aiogram.types import (
+    Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
+)
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ChatMemberStatus, ParseMode
 from dotenv import load_dotenv
@@ -24,21 +25,24 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bhinnekabot")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-TON_DEST = os.getenv("TON_DEST_ADDRESS")                      # alamat tujuan TON
+TON_DEST = os.getenv("TON_DEST_ADDRESS")  # alamat tujuan TON
 TON_API = os.getenv("TONCENTER_API", "https://toncenter.com/api/v2")
 TON_API_KEY = os.getenv("TONCENTER_API_KEY", "")
 PREMIUM_PRICE_TON = float(os.getenv("PREMIUM_PRICE_TON", "1.0"))
 PREMIUM_DAYS = int(os.getenv("PREMIUM_DAYS", "30"))
 
 # ==== KOMUNITAS & GRUP ====
-COMMUNITY_LINK = "https://t.me/bhinneka_coin"   # grup/channel komunitas
-X_LINK         = "https://x.com/bhinneka_coin"  # opsional
-COMMUNITY_CHAT_ID = "@bhinneka_coin"            # pastikan bot adalah admin di grup ini
+COMMUNITY_LINK = "https://t.me/bhinneka_coin"
+X_LINK = "https://x.com/bhinneka_coin"
+# Bisa username berawalan @ atau ID numerik; jika kosong, fitur verifikasi akan di-skip
+COMMUNITY_CHAT_ID = os.getenv("COMMUNITY_CHAT_ID", "@bhinneka_coin")
 
-assert BOT_TOKEN and TON_DEST, "Set BOT_TOKEN & TON_DEST_ADDRESS di env/secrets"
+if not BOT_TOKEN or not TON_DEST:
+    raise RuntimeError("Set BOT_TOKEN & TON_DEST_ADDRESS di env/secrets")
 
 bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
+r = Router(name="bhinneka")
 
 DB_PATH = "bhinneka.db"
 
@@ -56,7 +60,7 @@ TASKS = [
     "Retweet pinned post (X) & mention #BHEK",
 ]
 
-# ---------- MAIN KEYBOARD (GLOBAL, REUSABLE) ----------
+# ---------- MAIN KEYBOARD ----------
 MAIN_KB = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="👥 Join Telegram", url=COMMUNITY_LINK)],
@@ -89,11 +93,10 @@ async def init_db():
                 status TEXT DEFAULT 'PENDING'
             );
 
-            -- Quest harian (UTC), satu klaim per user per hari
             CREATE TABLE IF NOT EXISTS quests (
                 user_id INTEGER,
-                day TEXT,               -- YYYYMMDD (UTC)
-                claimed_at INTEGER,     -- epoch seconds UTC
+                day TEXT,
+                claimed_at INTEGER,
                 PRIMARY KEY (user_id, day)
             );
 
@@ -142,7 +145,7 @@ async def get_status(user_id: int):
             return f"🌟 Premium aktif hingga <b>{exp}</b>."
         return "🟢 Akun terdaftar. Premium: <b>Tidak aktif</b>."
 
-# ---------- Quest & Points helpers ----------
+# ---------- Quest helpers ----------
 def _today_key_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d")
 
@@ -164,7 +167,7 @@ async def record_claim(user_id: int) -> bool:
             await db.commit()
         return True
     except Exception:
-        return False  # kemungkinan sudah ada (PRIMARY KEY)
+        return False
 
 async def add_points(user_id: int, amount: int):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -193,13 +196,7 @@ def build_tonhub_link(address: str, amount_ton: float, comment: str) -> str:
     return f"https://tonhub.com/transfer/{address}?amount={amount_nano}&text={quote(comment)}"
 
 def build_tonviewer_address(address: str) -> str:
-    # Explorer saja (bukan halaman transfer).
     return f"https://tonviewer.com/{address}"
-
-def build_tonviewer_link(address: str, amount_ton: float, comment: str) -> str:
-    from urllib.parse import quote
-    amount_nano = int(amount_ton * 1_000_000_000)
-    return f"https://tonviewer.com/transfer/{address}?amount={amount_nano}&text={quote(comment)}"
 
 async def ton_get_transactions(address: str, limit: int = 20):
     params = {"address": address, "limit": limit}
@@ -238,7 +235,6 @@ async def premium_watcher():
     await asyncio.sleep(3)
     while True:
         try:
-            # tandai order expired (>24h)
             now_ts = int(time.time())
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute(
@@ -299,7 +295,7 @@ async def premium_watcher():
 
         await asyncio.sleep(15)
 
-# ---------- Inline keyboards ----------
+# ---------- Keyboards ----------
 def premium_keyboard(link_app: str, link_tonhub: str, link_tgwallet: str, link_explorer: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -312,20 +308,18 @@ def premium_keyboard(link_app: str, link_tonhub: str, link_tgwallet: str, link_e
     )
 
 # ---------- Handlers ----------
-@dp.message(CommandStart())
+@r.message(CommandStart())
 async def cmd_start(msg: Message):
     logger.info("START from uid=%s username=%s", msg.from_user.id, msg.from_user.username)
-
-    # Tambahan: log explicit bahwa command /start diterima
-    logger.info(">>> /start command diterima dan sedang diproses...")
-
     await upsert_user(msg)
     await msg.answer(WELCOME_TEXT, reply_markup=MAIN_KB)
+    logger.info("Sent /start reply to uid=%s", msg.from_user.id)
 
-    # Tambahan: log explicit bahwa balasan sudah dikirim
-    logger.info(">>> /start balasan berhasil dikirim ke uid=%s", msg.from_user.id)
+@r.message(Command("ping"))
+async def cmd_ping(msg: Message):
+    await msg.answer("🏓 Pong!")
 
-@dp.message(Command("tasks"))
+@r.message(Command("tasks"))
 async def cmd_tasks(msg: Message):
     lines = ["📋 <b>Quest Harian</b>"]
     for i, t in enumerate(TASKS, 1):
@@ -333,56 +327,44 @@ async def cmd_tasks(msg: Message):
     lines.append("\nKetik <code>/claim</code> setelah selesai.")
     await msg.answer("\n".join(lines), reply_markup=MAIN_KB)
 
-@dp.message(Command("claim"))
+@r.message(Command("claim"))
 async def cmd_claim(msg: Message):
     uid = msg.from_user.id
     try:
-        member = await bot.get_chat_member(COMMUNITY_CHAT_ID, uid)
-        status_ok = member.status in {
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.ADMINISTRATOR,
-            # beberapa versi aiogram menggunakan OWNER, sebagian CREATOR
-            getattr(ChatMemberStatus, "CREATOR", ChatMemberStatus.ADMINISTRATOR),
-            getattr(ChatMemberStatus, "OWNER", ChatMemberStatus.ADMINISTRATOR),
-        }
-        if not status_ok:
-            await msg.answer(
-                "❌ Kamu belum terdeteksi di grup. Silakan join via tombol di /tasks.",
-                reply_markup=MAIN_KB
-            )
-            return
+        # jika tidak dikonfigurasi, skip verifikasi join
+        if COMMUNITY_CHAT_ID:
+            member = await bot.get_chat_member(COMMUNITY_CHAT_ID, uid)
+            status_ok = member.status in {
+                ChatMemberStatus.MEMBER,
+                ChatMemberStatus.ADMINISTRATOR,
+                getattr(ChatMemberStatus, "CREATOR", ChatMemberStatus.ADMINISTRATOR),
+                getattr(ChatMemberStatus, "OWNER", ChatMemberStatus.ADMINISTRATOR),
+            }
+            if not status_ok:
+                await msg.answer(
+                    "❌ Kamu belum terdeteksi di grup. Silakan join via tombol di /tasks.",
+                    reply_markup=MAIN_KB
+                )
+                return
 
-        # Sudah join → cek apakah sudah klaim hari ini
         if await has_claimed_today(uid):
-            await msg.answer(
-                "ℹ️ Kamu sudah klaim quest hari ini. Datang lagi besok ya! ✨",
-                reply_markup=MAIN_KB
-            )
+            await msg.answer("ℹ️ Kamu sudah klaim quest hari ini. Datang lagi besok ya! ✨", reply_markup=MAIN_KB)
             return
 
         if await record_claim(uid):
-            # reward poin
             await add_points(uid, 10)
             pts = await get_points(uid)
             await msg.answer(
-                f"✅ Klaim kamu dicatat. (+10 poin)\n"
-                f"Saat ini total poinmu: <b>{pts}</b>\n\n"
-                f"(Sistem reward penuh akan diaktifkan setelah Premium).",
+                f"✅ Klaim dicatat (+10 poin). Total poin: <b>{pts}</b>",
                 reply_markup=MAIN_KB
             )
         else:
-            await msg.answer(
-                "ℹ️ Terlihat kamu sudah klaim hari ini. Sampai jumpa besok! 👋",
-                reply_markup=MAIN_KB
-            )
+            await msg.answer("ℹ️ Terlihat kamu sudah klaim hari ini. Sampai jumpa besok! 👋", reply_markup=MAIN_KB)
+    except Exception as e:
+        logger.exception("verify/claim error: %s", e)
+        await msg.answer("⚠️ Tidak bisa memverifikasi. Pastikan bot sudah ada di grup dan coba lagi.", reply_markup=MAIN_KB)
 
-    except Exception:
-        await msg.answer(
-            "⚠️ Tidak bisa memverifikasi. Pastikan bot sudah ada di grup dan coba lagi.",
-            reply_markup=MAIN_KB
-        )
-
-@dp.message(Command("queststatus"))
+@r.message(Command("queststatus"))
 async def cmd_queststatus(msg: Message):
     uid = msg.from_user.id
     async with aiosqlite.connect(DB_PATH) as db:
@@ -396,12 +378,12 @@ async def cmd_queststatus(msg: Message):
     )
     await msg.answer(txt, reply_markup=MAIN_KB)
 
-@dp.message(Command("points"))
+@r.message(Command("points"))
 async def cmd_points(msg: Message):
     pts = await get_points(msg.from_user.id)
     await msg.answer(f"🏅 Total poin kamu: <b>{pts}</b>", reply_markup=MAIN_KB)
 
-@dp.message(Command("premium"))
+@r.message(Command("premium"))
 async def cmd_premium(msg: Message):
     uid = msg.from_user.id
     code = f"BHEK-{uid}-{secrets.token_hex(2).upper()}"
@@ -414,8 +396,6 @@ async def cmd_premium(msg: Message):
         )
         await db.commit()
 
-    logger.info("Order created uid=%s code=%s price=%.3f", uid, code, PREMIUM_PRICE_TON)
-
     link_app = build_ton_deeplink(TON_DEST, PREMIUM_PRICE_TON, code)
     link_web = build_tonhub_link(TON_DEST, PREMIUM_PRICE_TON, code)
     link_tgwallet = build_tgwallet_link(TON_DEST, PREMIUM_PRICE_TON, code)
@@ -426,21 +406,17 @@ async def cmd_premium(msg: Message):
         f"Harga: <b>{PREMIUM_PRICE_TON} TON</b> untuk {PREMIUM_DAYS} hari.\n"
         f"Alamat: <code>{TON_DEST}</code>\n"
         f"Komentar (WAJIB): <code>{code}</code>\n\n"
-        "1) Pilih salah satu: <b>Pay in TON (App)</b>, "
-        "<b>Pay via Web (Tonhub)</b>, atau <b>Pay via Telegram Wallet</b>\n"
+        "1) Pilih salah satu: <b>Pay in TON (App)</b>, <b>Pay via Web (Tonhub)</b>, atau "
+        "<b>Pay via Telegram Wallet</b>\n"
         "2) Pastikan <b>comment</b> PERSIS sama\n"
         "3) Setelah bayar, tekan <b>Saya sudah transfer</b>\n\n"
-        "Bot memverifikasi di blockchain dan otomatis mengaktifkan status Premium ✅"
+        "Bot akan memverifikasi on-chain dan mengaktifkan Premium ✅"
     )
 
-    
-    await msg.answer(
-        text,
-        reply_markup=premium_keyboard(link_app, link_web, link_tgwallet, link_explorer)
-    )
+    await msg.answer(text, reply_markup=premium_keyboard(link_app, link_web, link_tgwallet, link_explorer))
 
-@dp.callback_query(F.data == "check_payment")
-async def cb_check_payment(cb):
+@r.callback_query(F.data == "check_payment")
+async def cb_check_payment(cb: CallbackQuery):
     uid = cb.from_user.id
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
@@ -462,13 +438,13 @@ async def cb_check_payment(cb):
     await cb.message.answer("\n".join(lines), reply_markup=MAIN_KB)
     await cb.answer()
 
-@dp.message(Command("status"))
+@r.message(Command("status"))
 async def cmd_status(msg: Message):
-    await upsert_user(msg)  # opsional, auto terdaftar
+    await upsert_user(msg)
     s = await get_status(msg.from_user.id)
     await msg.answer(s, reply_markup=MAIN_KB)
 
-@dp.message(Command("help"))
+@r.message(Command("help"))
 async def cmd_help(msg: Message):
     await msg.answer(
         "📖 <b>Command List</b>\n\n"
@@ -479,14 +455,32 @@ async def cmd_help(msg: Message):
         "/points — Lihat total poin\n"
         "/premium — Beli Premium via TON\n"
         "/status — Cek status Premium\n"
+        "/ping — Tes respons bot\n"
         "/help — Panduan semua command",
         reply_markup=MAIN_KB
     )
-    
+
+# Fallback untuk command yang tidak dikenal (opsional tapi membantu debug)
+@r.message(F.text.regexp(r"^/"))
+async def unknown_command(msg: Message):
+    await msg.answer("❓ Perintah tidak dikenali. Coba /help.", reply_markup=MAIN_KB)
+
+# ---------- Error logging ----------
+@dp.errors()
+async def on_error(event, exception):
+    logger.exception("Unhandled error: %s | Update=%s", exception, getattr(event, "update", None))
+
 # ---------- Main ----------
 async def main():
     logger.info("Bot booting...")
     await init_db()
+
+    # pastikan polling, tidak tertahan webhook lama
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Webhook deleted (drop_pending_updates=True).")
+    except Exception as e:
+        logger.warning("delete_webhook failed: %s", e)
 
     # set menu commands
     await bot.set_my_commands([
@@ -497,12 +491,18 @@ async def main():
         BotCommand(command="points", description="Lihat total poin"),
         BotCommand(command="premium", description="Beli Premium via TON"),
         BotCommand(command="status", description="Cek status Premium"),
-        BotCommand(command="help", description="Bantuan"),
+        BotCommand(command="ping", description="Tes respons bot"),
+        BotCommand(command="help", description="Panduan"),
     ])
 
+    # daftarkan router
+    dp.include_router(r)
+
+    # jalankan watcher verifikasi premium
     asyncio.create_task(premium_watcher())
-    logger.info("🚀 BhinnekaBot is polling for updates...")
-    await dp.start_polling(bot)
+
+    logger.info("🚀 BhinnekaBot is polling for updates…")
+    await dp.start_polling(bot, allowed_updates=None)  # None = semua
 
 if __name__ == "__main__":
     try:
