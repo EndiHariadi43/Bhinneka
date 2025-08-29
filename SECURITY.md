@@ -1,22 +1,23 @@
 # Security Policy
 
-Kami sangat menghargai laporan kerentanan.
+We highly value reports of potential vulnerabilities.
 
 ## Supported Versions
-Kami aktif merawat branch `main` dan rilis terbaru.
+We actively maintain the `main` branch and the latest release.
 
 ## Reporting a Vulnerability
-Laporkan secara privat ke **endi.linux.mint@gmail.com**.
-Sertakan:
-- Deskripsi singkat & dampak
-- Langkah reproduksi
-- Lingkungan (OS, versi Python, dsb)
-- Bukti (log/PoC) jika ada
+Please report privately to **endi.linux.mint@gmail.com**.  
+Include the following details:
+- A short description of the issue and its potential impact  
+- Steps to reproduce  
+- Environment details (OS, Python version, etc.)  
+- Proof or evidence (logs/PoC) if available  
 
-Kami berusaha:
-- Menjawab dalam **72 jam**
-- Memberi status perbaikan berkala
-- Mengumumkan perbaikan setelah rilis patch
+## Response Commitments
+We strive to:
+- Respond within **72 hours**, or no later than **7×24 hours**  
+- Provide regular status updates on the fix  
+- Publicly disclose the resolution after a patch has been released  
 
 ## Safe Harbor
-Penelitian keamanan yang dilakukan dengan niat baik (tanpa akses ilegal, tanpa merusak data/layanan) tidak akan kami tuntut.
+Security research conducted in good faith (without unauthorized access, and without harming data or services) will not be subject to legal action.
