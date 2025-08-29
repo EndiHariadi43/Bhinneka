@@ -6,7 +6,7 @@ Kami sangat menghargai laporan kerentanan.
 Kami aktif merawat branch `main` dan rilis terbaru.
 
 ## Reporting a Vulnerability
-Laporkan secara privat ke **endilinuxmint@gmail.com**.
+Laporkan secara privat ke **endi.linux.mint@gmail.com**.
 Sertakan:
 - Deskripsi singkat & dampak
 - Langkah reproduksi
