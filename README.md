@@ -40,7 +40,7 @@ pip install -r requirements.txt
 
 # Set environment variables
 export BOT_TOKEN=xxx
-export TON_DEST_ADDRESS=UQC...           # your TON wallet
+export TON_DEST_ADDRESS=UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5           # your TON wallet
 
 # Run bot
 python bhinnekabot.py
