@@ -22,7 +22,8 @@ import { ERC20Burnable } from "@openzeppelin/contracts/token/ERC20/extensions/ER
 import { ERC20Pausable } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /**
  * @title Bhinneka (BHEK)
@@ -31,14 +32,20 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
  *           - Fixed supply (all tokens minted at deployment)
  *           - Burnable (holders can burn their tokens)
  *           - Pausable (owner can pause transfers in emergencies)
- *           - EIP‑2612 Permit (gasless approvals)
+ *           - EIP-2612 Permit (gasless approvals)
  *           - Asset recovery helpers (owner can rescue stuck tokens/native coin)
  *
  * @dev This contract uses OpenZeppelin Contracts v5.x.
  *      Constructor mints the full initial supply to a configurable recipient.
  *      No further minting is possible after deployment.
  */
-contract Bhinneka is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, Ownable {
+contract Bhinneka is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, Ownable2Step {
+    using SafeERC20 for IERC20;
+
+    /* ----------------------------------- Events ----------------------------------- */
+    event TokensRecovered(address indexed token, address indexed to, uint256 amount);
+    event NativeRecovered(address indexed to, uint256 amount);
+
     /**
      * @notice Deploy the Bhinneka token.
      * @param initialOwner The address that will receive ownership rights.
@@ -54,7 +61,7 @@ contract Bhinneka is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, Ownable {
     )
         ERC20("Bhinneka", "BHEK")
         ERC20Permit("Bhinneka")
-        Ownable(initialOwner)
+        Ownable2Step(initialOwner)
     {
         require(initialOwner != address(0), "Owner=0");
         require(initialRecipient != address(0), "Recipient=0");
@@ -100,9 +107,13 @@ contract Bhinneka is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, Ownable {
      * @notice Recover ERC20 tokens accidentally sent to this contract.
      * @param token The ERC20 token address.
      * @param amount The token amount to recover.
+     *
+     * @dev Cannot recover this token (BHEK) to protect holders.
      */
     function recoverERC20(address token, uint256 amount) external onlyOwner {
-        IERC20(token).transfer(owner(), amount);
+        require(token != address(this), "Cannot recover BHEK");
+        IERC20(token).safeTransfer(owner(), amount);
+        emit TokensRecovered(token, owner(), amount);
     }
 
     /**
@@ -112,6 +123,7 @@ contract Bhinneka is ERC20, ERC20Burnable, ERC20Pausable, ERC20Permit, Ownable {
     function recoverNative(uint256 amount) external onlyOwner {
         (bool ok, ) = payable(owner()).call{value: amount}("");
         require(ok, "Native transfer failed");
+        emit NativeRecovered(owner(), amount);
     }
 
     /// @dev Allow receiving native coin.
