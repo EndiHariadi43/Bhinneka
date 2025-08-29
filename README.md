@@ -2,9 +2,9 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-@BHEK_bot-26A5E4?logo=telegram&logoColor=white)](https://t.me/BHEK_bot)
 
-# Bhinneka (BHEK) — Unity in Diversity
+# Bhinneka ($BHEK) — Unity in Diversity
 
-Bhinneka (BHEK) is a community-driven meme coin inspired by the spirit of *“Bhinneka Tunggal Ika”* — Unity in Diversity.  
+Bhinneka ($BHEK) is a community-driven meme coin inspired by the spirit of *“Bhinneka Tunggal Ika”* — Unity in Diversity.  
 This repo contains:
 - **BhinnekaBot** (Telegram) with **TON Premium** payment & on-chain verification  
 - Minimal **ERC20/BEP20** contract (OpenZeppelin-based)  
