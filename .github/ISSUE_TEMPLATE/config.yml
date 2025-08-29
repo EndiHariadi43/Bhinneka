@@ -1,5 +1,6 @@
 blank_issues_enabled: false
+
 contact_links:
-  - name: Security reports
+  - name: 🔒 Security reports
     url: mailto:endi.linux.mint@gmail.com
-    about: Laporkan kerentanan keamanan secara privat
+    about: Please report security vulnerabilities privately via email. Do not open a public issue.
