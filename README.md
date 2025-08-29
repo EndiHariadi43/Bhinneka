@@ -31,12 +31,16 @@ It’s simple, fair, and a win–win for everyone.
 
 ---
 
-## Quick Start (Local)
+## ⚡ Quick Start (Local)
 
 ```bash
+# Setup environment
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
+
+# Set environment variables
 export BOT_TOKEN=xxx
 export TON_DEST_ADDRESS=UQC...           # your TON wallet
+
+# Run bot
 python bhinnekabot.py
-```
