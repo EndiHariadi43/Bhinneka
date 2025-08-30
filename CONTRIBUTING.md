@@ -68,3 +68,10 @@ docs: update README with Quick Start
 By following these guidelines, your contributions can be reviewed and merged faster, helping the community grow stronger.
 Thank you 🙏
 
+---
+
+## 🤝 Code of Conduct
+
+Please note that this project is released with a [Code of Conduct](./CODE_OF_CONDUCT.md).  
+By participating, you agree to abide by its terms.
+
