@@ -19,7 +19,7 @@ git checkout -b feat/your-feature-name
 
 ---
 
-🛠 Setup Development Environment
+## 🛠 Setup Development Environment
 Before contributing, please set up a local environment:
 ```
 # Clone your fork
