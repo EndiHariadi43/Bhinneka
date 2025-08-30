@@ -21,3 +21,12 @@ We strive to:
 
 ## Safe Harbor
 Security research conducted in good faith (without unauthorized access, and without harming data or services) will not be subject to legal action.
+
+## Out of Scope
+- Denial of Service (DoS) via excessive requests
+- Vulnerabilities requiring physical access
+- Reports of outdated packages without a working exploit
+
+## Disclosure
+Fixes will be released as part of our regular [GitHub Releases](./releases).
+We will credit researchers who responsibly disclose vulnerabilities (unless anonymity is requested).
