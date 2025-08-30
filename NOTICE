@@ -1,0 +1,41 @@
+Bhinneka (BHEK)
+Copyright 2025 Endi Hariadi
+
+This product is licensed under the Apache License, Version 2.0.
+You may obtain a copy of the License at:
+    http://www.apache.org/licenses/LICENSE-2.0
+
+-------------------------------------------------------------------------------
+ATTRIBUTIONS & THIRD-PARTY COMPONENTS
+-------------------------------------------------------------------------------
+
+This project makes use of open-source software components. The following 
+acknowledgments are provided as required by their respective licenses.
+
+1. OpenZeppelin Contracts
+   - Copyright (c) 2016-present OpenZeppelin
+   - Licensed under the MIT License
+   - https://github.com/OpenZeppelin/openzeppelin-contracts
+
+2. aiogram (Telegram Bot Framework for Python)
+   - Copyright (c) 2017-present aiogram developers
+   - Licensed under the MIT License
+   - https://github.com/aiogram/aiogram
+
+3. httpx (HTTP client for Python)
+   - Copyright (c) 2018-present Encode OSS Ltd
+   - Licensed under the BSD License
+   - https://github.com/encode/httpx
+
+4. aiosqlite (Async SQLite for Python)
+   - Copyright (c) 2018-2023 John Reese and contributors
+   - Licensed under the Apache License, Version 2.0
+   - https://github.com/omnilib/aiosqlite
+
+-------------------------------------------------------------------------------
+DISCLAIMER
+-------------------------------------------------------------------------------
+
+This project and its contributors are not responsible for damages, loss of data,
+or any other liability arising from the use of this software, which is provided
+on an "AS IS" basis, without warranties or conditions of any kind.
