@@ -46,7 +46,7 @@ docs: update README with Quick Start
 
 ---
 
-## ## 🐛 Issues & Pull Requests
+## 🐛 Issues & Pull Requests
 
 - Use issue/PR templates (if provided)
 - For bugs, include clear reproduction steps
