@@ -60,3 +60,11 @@ export TON_DEST_ADDRESS=UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5        
 
 # Run bot
 python bhinnekabot.py
+```
+
+---
+
+## 📜 License
+
+This project is licensed under the [Apache License 2.0](./LICENSE).  
+See the [NOTICE](./NOTICE) file for additional attributions and third-party components.
