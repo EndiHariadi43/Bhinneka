@@ -19,6 +19,26 @@ git checkout -b feat/your-feature-name
 
 ---
 
+🛠 Setup Development Environment
+Before contributing, please set up a local environment:
+```
+# Clone your fork
+git clone https://github.com/your-username/Bhinneka.git
+cd Bhinneka
+
+# Create a virtual environment (Python >= 3.11)
+python -m venv .venv && source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# (Optional) run tests if available
+pytest
+
+```
+
+---
+
 ## 💐 Code Guidelines
 
 - Python >= 3.11 (as used in GitHub Actions workflows)
