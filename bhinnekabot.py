@@ -38,12 +38,38 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bhinnekabot")
 
+# (BARU) mode resmi & alamat resmi
+def _to_bool(s: str | None) -> bool:
+    return str(s).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+OFFICIAL_ONLY = _to_bool(os.getenv("OFFICIAL_ONLY", "0"))
+OFFICIAL_TON_ADDRESS = os.getenv(
+    "OFFICIAL_TON_ADDRESS",
+    "UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5",  # default resmi
+)
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-TON_DEST = os.getenv("TON_DEST_ADDRESS")  # alamat tujuan TON
+TON_DEST = os.getenv("TON_DEST_ADDRESS")  # alamat tujuan TON (boleh kosong jika OFFICIAL_ONLY=1)
 TON_API = os.getenv("TONCENTER_API", "https://toncenter.com/api/v2")
 TON_API_KEY = os.getenv("TONCENTER_API_KEY", "")
 PREMIUM_PRICE_TON = float(os.getenv("PREMIUM_PRICE_TON", "1.0"))
 PREMIUM_DAYS = int(os.getenv("PREMIUM_DAYS", "30"))
+
+# Terapkan mode resmi (jika diaktifkan)
+if OFFICIAL_ONLY:
+    # Kalau user set TON_DEST lain, paksa ke OFFICIAL_TON_ADDRESS
+    if TON_DEST and TON_DEST != OFFICIAL_TON_ADDRESS:
+        logger.warning("OFFICIAL_ONLY=ON — overriding TON_DEST to OFFICIAL_TON_ADDRESS")
+    TON_DEST = OFFICIAL_TON_ADDRESS
+    logger.info("Running in OFFICIAL mode. TON_DEST set to OFFICIAL_TON_ADDRESS.")
+
+# Validasi env yang wajib
+if not BOT_TOKEN:
+    raise RuntimeError("Set BOT_TOKEN di env/secrets")
+
+if not TON_DEST:
+    # Jika OFFICIAL_ONLY=0 dan TON_DEST kosong → stop, karena tidak tahu alamat tujuan
+    raise RuntimeError("TON_DEST_ADDRESS tidak terisi (atau set OFFICIAL_TON_ADDRESS jika OFFICIAL_ONLY=1)")
 
 # ==== KOMUNITAS & GRUP ====
 COMMUNITY_LINK = "https://t.me/bhinneka_coin"
