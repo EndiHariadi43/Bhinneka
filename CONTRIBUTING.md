@@ -23,7 +23,7 @@ git checkout -b feat/your-feature-name
 Before contributing, please set up a local environment:
 ```
 # Clone your fork
-git clone https://github.com/your-username/Bhinneka.git
+git clone https://github.com/EndiHariadi43/Bhinneka.git
 cd Bhinneka
 
 # Create a virtual environment (Python >= 3.11)
