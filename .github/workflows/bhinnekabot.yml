@@ -21,6 +21,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # NEW: Show run context (untuk debugging)
+      - name: Show run context
+        run: |
+          echo "Repo        : $GITHUB_REPOSITORY"
+          echo "Run ID      : $GITHUB_RUN_ID"
+          echo "Attempt     : $GITHUB_RUN_ATTEMPT"
+          echo "Actor       : $GITHUB_ACTOR"
+          echo "Branch      : $GITHUB_REF_NAME"
+          echo "Concurrency : group='bhinnekabot' (cancel-in-progress=true)"
+          echo "Note        : If a previous run is canceled, it's a NORMAL rotation."
+
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
         with:
@@ -74,6 +85,9 @@ jobs:
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
+
+          # NEW: tangkap SIGTERM agar log jelas saat job dibatalkan
+          trap 'echo "⚠️  Received SIGTERM — likely concurrency rotation or manual cancel. Exiting gracefully..."; exit 0' TERM
 
           # Jalankan dengan timeout; jangan hentikan skrip saat exit!=0 agar bisa cek kode 124
           set +e
