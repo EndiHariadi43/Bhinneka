@@ -4,64 +4,69 @@
 
 # Bhinneka ($BHEK) — Unity in Diversity
 
-Bhinneka ($BHEK) is a community-driven meme coin inspired by the spirit of *“Bhinneka Tunggal Ika”* — Unity in Diversity.  
-This repo contains:
-- [**BhinnekaBot**](https://t.me/BHEK_bot) — Telegram bot with TON Premium payment & on-chain verification  
+**Bhinneka ($BHEK)** is a community-driven meme coin inspired by the timeless spirit of *“Bhinneka Tunggal Ika”* — Unity in Diversity.  
+
+This repository contains:
+- [**BhinnekaBot**](https://t.me/BHEK_bot) — Telegram bot with TON Premium payments & on-chain verification  
 - [**Bhinneka Community**](https://t.me/bhinneka_coin) — Public group for discussions & updates  
 - Minimal **ERC20/BEP20** contract (OpenZeppelin-based)  
-- GitHub Actions workflow to run the bot 24/7 (long polling, rotating every 6h)
+- GitHub Actions workflow to keep the bot running 24/7 (long polling, rotating every 6h)  
 
 ---
 
-## 🌏 The Philosophy of Unity in Diversity
+## 🌏 The Philosophy of *Unity in Diversity*
 
-> *“Unity in Diversity” (Bhinneka Tunggal Ika)* comes from the 14th century *Sutasoma* manuscript by Mpu Tantular,  
-> meaning **“They are many, yet they are one.”**  
+> *“Bhinneka Tunggal Ika”* comes from the 14th-century *Sutasoma* manuscript by Mpu Tantular,  
+> meaning **“They are many, yet they are one.”**
 
-This philosophy became Indonesia’s national motto, symbolizing unity among diverse ethnicities, languages, cultures, and beliefs.  
+This motto later became the foundation of Indonesia’s national identity, symbolizing harmony among diverse ethnicities, languages, cultures, and beliefs.  
 
-BHEK adopts this timeless wisdom into the crypto world:  
-- Connecting diverse communities across the globe.  
-- Uniting people under **fairness**, **transparency**, and **collective growth**.  
-- Building a sustainable ecosystem that thrives on cooperation.  
+BHEK embraces this wisdom in the crypto space:  
+- 🌐 Connecting communities across the globe  
+- ⚖️ Promoting fairness, transparency, and collective growth  
+- 🤝 Building a sustainable ecosystem based on cooperation  
 
-With the spirit of *Unity in Diversity*, $BHEK is not just a meme coin, but a **symbol of collaboration without borders**. 🚀  
+With this philosophy, **$BHEK is more than just a meme coin** — it’s a **symbol of collaboration without borders**. 🚀  
 
 ---
 
 ## 🚀 Earn Passive Income with Referrals
 
-We believe in **community empowerment** — and now you can be rewarded simply by sharing Bhinneka ($BHEK) with your friends!
+We believe in **community empowerment** — now you can earn rewards simply by sharing Bhinneka ($BHEK) with your friends!
 
-✨ **How it works**:  
-1. Share your **special referral link** below.  
-2. When your friends trade, you earn **10% of their trading fees** — instantly, transparently, and on-chain.  
-3. No limits: invite more friends = earn more rewards.
+✨ **How it works:**  
+1. Share your **special referral link**.  
+2. Every time your friends trade, you earn **10% of their trading fees** — instantly, transparently, and on-chain.  
+3. No limits: the more you share, the more you earn.  
 
 🔥 Don’t miss this chance to generate **passive income** while helping our community grow stronger.  
-It’s simple, fair, and a win–win for everyone.
+It’s simple, fair, and a win–win for everyone.  
 
 🔗 **Your Referral Link**  
 👉 [Claim Rewards Here](https://four.meme/token/0x10bf27e03364b9cb471641893bbe4895dddc4444?code=K3QL9TE2KCHC)
 
-> 💡 Tip: Pin this link on your social media or share it directly with friends — every trade counts toward your reward!
+> 💡 Pro tip: Pin this link on your socials or share it directly — every trade counts toward your rewards!
 
 ---
 
-## ⚡ Quick Start (Local)
+## ⚡ Quick Start (Local Development)
+
+You can run the bot locally for testing or development.
 
 ```bash
-# Setup environment
+# 1. Setup environment
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 
-# Set environment variables
-export BOT_TOKEN=xxx
-export TON_DEST_ADDRESS=UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5           # your TON wallet
+# 2. Create a .env file with your secrets
+echo "BOT_TOKEN=your-telegram-bot-token" >> .env
+echo "TON_DEST_ADDRESS=your-ton-wallet-address" >> .env
 
-# Run bot
+# 3. Run the bot
 python bhinnekabot.py
 ```
+
+> 📝 See [SECURITY.md](./SECURITY.md) for reporting vulnerabilities, and [CONTRIBUTING.md](./CONTRIBUTING.md) if you’d like to help improve the project.
 
 ---
 
