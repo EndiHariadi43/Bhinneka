@@ -1,8 +1,6 @@
 [![Actions Status](https://img.shields.io/github/actions/workflow/status/EndiHariadi43/Bhinneka/bhinnekabot.yml?branch=main)](https://github.com/EndiHariadi43/Bhinneka/actions/workflows/bhinnekabot.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-@BHEK_bot-26A5E4?logo=telegram&logoColor=white)](https://t.me/BHEK_bot)
-[![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink?style=for-the-badge)](https://github.com/sponsors/EndiHariadi43)
-[![Patreon](https://img.shields.io/badge/Patreon-Support-orange?style=for-the-badge&logo=patreon)](https://patreon.com/EndiHariadi43)
 
 # Bhinneka ($BHEK) — Unity in Diversity
 
@@ -69,6 +67,20 @@ python bhinnekabot.py
 ```
 
 > 📝 See [SECURITY.md](./SECURITY.md) for reporting vulnerabilities, and [CONTRIBUTING.md](./CONTRIBUTING.md) if you’d like to help improve the project.
+
+---
+
+## 💖 Support this project
+
+Your support helps keep **Bhinneka ($BHEK)** alive and growing.  
+Every contribution goes to development, hosting, and community rewards.
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink?style=for-the-badge)](https://github.com/sponsors/EndiHariadi43)
+[![Patreon](https://img.shields.io/badge/Patreon-Support-orange?style=for-the-badge&logo=patreon)](https://patreon.com/EndiHariadi43)
+
+Or support via local platforms:  
+[![Saweria](https://img.shields.io/badge/Saweria-Donate-green?style=flat&logo=money)](https://saweria.co/yourSaweriaID)  
+[![Trakteer](https://img.shields.io/badge/Trakteer-Support-red?style=flat)](https://trakteer.id/yourTrakteerID)
 
 ---
 
