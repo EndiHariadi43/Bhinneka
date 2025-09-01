@@ -1,0 +1,21 @@
+# .yamllint
+extends: default
+
+rules:
+  line-length:
+    max: 140
+    level: warning
+  truthy:
+    level: warning
+  indentation:
+    indent-sequences: consistent
+    check-multi-line-strings: false
+  trailing-spaces: enable
+  document-start: disable
+
+ignore: |
+  .git/
+  node_modules/
+  dist/
+  build/
+  **/*.md
