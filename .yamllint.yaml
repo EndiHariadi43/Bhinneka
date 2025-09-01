@@ -1,9 +1,9 @@
-# Konfigurasi yamllint untuk SELURUH repo
+# .yamllint.yaml
 extends: default
 
 rules:
   line-length:
-    max: 160
+    max: 140
     level: warning
   truthy:
     level: warning
@@ -13,11 +13,9 @@ rules:
   trailing-spaces: enable
   document-start: disable
 
-# Folder/file yang diabaikan pada lint umum
 ignore: |
   .git/
   node_modules/
   dist/
   build/
   **/*.md
-  .github/workflows/*      # <- workflows di-skip di lint umum, dilint terpisah dengan config override
