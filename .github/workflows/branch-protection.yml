@@ -1,4 +1,3 @@
-# .github/workflows/branch-protection.yml
 name: Branch Policy Checks
 
 on:
@@ -12,14 +11,13 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: check
+  yamllint:                  # <--- ubah dari "check" jadi "yamllint"
+    name: yamllint           # <--- ini yang akan muncul di Required status checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Opsional tapi berguna: lint semua YAML agar PR tidak bawa YAML rusak
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -31,6 +29,5 @@ jobs:
       - name: Run yamllint
         run: yamllint -s .
 
-      # Bisa tambahkan pemeriksaan ringan lain di sini jika perlu
       - name: Branch policy marker
-        run: echo "branch protection check ok"
+        run: echo "✅ branch protection check ok"
