@@ -48,6 +48,14 @@ OFFICIAL_TON_ADDRESS = os.getenv(
     "UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5",  # default resmi
 )
 
+TON_DEST = os.getenv("TON_DEST_ADDRESS")
+
+if OFFICIAL_ONLY:
+    if TON_DEST and TON_DEST != OFFICIAL_TON_ADDRESS:
+        logger.warning("OFFICIAL_ONLY=ON — overriding TON_DEST to OFFICIAL_TON_ADDRESS")
+    TON_DEST = OFFICIAL_TON_ADDRESS
+    logger.info("Running in OFFICIAL mode. TON_DEST set to OFFICIAL_TON_ADDRESS.")
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TON_DEST = os.getenv("TON_DEST_ADDRESS")  # alamat tujuan TON (boleh kosong jika OFFICIAL_ONLY=1)
 TON_API = os.getenv("TONCENTER_API", "https://toncenter.com/api/v2")
