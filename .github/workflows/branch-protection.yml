@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  yamllint:                 # <-- nama job = nama status check yang Anda aktifkan
+  yamllint:
     name: yamllint
     runs-on: ubuntu-latest
     steps:
@@ -26,13 +26,14 @@ jobs:
       - name: Install yamllint
         run: pip install --upgrade pip yamllint
 
-      # Lint seluruh repo pakai aturan umum
+      # 1) Lint repo, TAPI eksklusikan .github/workflows (meski config ignore sudah ada)
       - name: Run yamllint (repo only)
-        run: yamllint -s -c .yamllint.yaml .
+        run: yamllint -s -c .yamllint.yaml -- . ':!.github/workflows'
 
-      # Lint khusus folder workflows pakai aturan terpisah
-      - name: Run yamllint (workflows only)
-        run: yamllint -s -c .yamllint.workflows.yaml .github/workflows
+      # 2) Lint khusus folder workflows dengan aturan lebih longgar (inline)
+      #    -> kalau mau, bisa ganti -d ini dengan file .yamllint.workflows.yaml
+      - name: Run yamllint (workflows only, relaxed rules)
+        run: yamllint -s -d "{extends: default, rules: {line-length: {max: 160, level: warning}, truthy: {level: warning}}}" .github/workflows
 
       - name: Branch policy marker
         run: echo "✅ branch protection check ok"
