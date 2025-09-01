@@ -1,14 +1,16 @@
+# Konfigurasi yamllint KHUSUS untuk .github/workflows
 extends: default
 
 rules:
   line-length:
-    max: 140
+    max: 160        # sedikit lebih longgar untuk baris command yang panjang
     level: warning
   truthy:
     level: warning
   indentation:
     indent-sequences: consistent
-    check-multi-line-strings: false
   trailing-spaces: enable
   document-start: disable
-# ⚠️ Tidak ada "ignore" di sini — supaya workflows benar-benar dicek
+
+# Jangan ignore apa pun di sini — kita memang ingin melint file workflow
+ignore: |
