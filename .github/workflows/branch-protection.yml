@@ -1,23 +1,36 @@
-name: branch-protection
+# .github/workflows/branch-protection.yml
+name: Branch Policy Checks
 
 on:
-  pull_request:
-    branches: [ main ]
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   check:
+    name: check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install yamllint
-        run: |
-          python -m pip install --upgrade pip
-          pip install yamllint
+      # Opsional tapi berguna: lint semua YAML agar PR tidak bawa YAML rusak
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-      - name: Validate YAML with config
-        run: |
-          yamllint -s -c .yamllint .
+      - name: Install yamllint
+        run: pip install --upgrade pip yamllint
+
+      - name: Run yamllint
+        run: yamllint -s .
+
+      # Bisa tambahkan pemeriksaan ringan lain di sini jika perlu
+      - name: Branch policy marker
+        run: echo "branch protection check ok"
