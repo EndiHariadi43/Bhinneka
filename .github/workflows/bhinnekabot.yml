@@ -70,40 +70,39 @@ jobs:
       - name: Ensure DB file exists (first run safety)
         run: |
           set -euo pipefail
-          python -c "import sqlite3; con=sqlite3.connect('bhinneka.db'); con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)'); con.commit(); con.close()"
+          python - <<'PY'
+          import sqlite3
+          con = sqlite3.connect('bhinneka.db')
+          con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
+          con.commit()
+          con.close()
+          PY
           ls -l bhinneka.db
 
       - name: Run bot (with logs, 345m timeout)
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          TON_DEST_ADDRESS: ${{ secrets.TON_DEST_ADDRESS }}
-          TONCENTER_API: ${{ secrets.TONCENTER_API }}
-          TONCENTER_API_KEY: ${{ secrets.TONCENTER_API_KEY }}
-          PREMIUM_PRICE_TON: ${{ secrets.PREMIUM_PRICE_TON }}
-          PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
-          PYTHONUNBUFFERED: "1"
-          OFFICIAL_ONLY: "1"
+          BOT_TOKEN:            ${{ secrets.BOT_TOKEN }}
+          TON_DEST_ADDRESS:     ${{ secrets.TON_DEST_ADDRESS }}
+          TONCENTER_API:        ${{ secrets.TONCENTER_API }}
+          TONCENTER_API_KEY:    ${{ secrets.TONCENTER_API_KEY }}
+          PREMIUM_PRICE_TON:    ${{ secrets.PREMIUM_PRICE_TON }}
+          PREMIUM_DAYS:         ${{ secrets.PREMIUM_DAYS }}
+          OFFICIAL_ONLY:        "1"
           OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
+          PYTHONUNBUFFERED:     "1"
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
-
-          # NEW: tangkap SIGTERM agar log jelas saat job dibatalkan
-          trap 'echo "⚠️  Received SIGTERM — likely concurrency rotation or manual cancel. Exiting gracefully..."; exit 0' TERM
-
-          # Jalankan dengan timeout; jangan hentikan skrip saat exit!=0 agar bisa cek kode 124
+          trap 'echo "⚠️  SIGTERM (likely rotation/cancel). Exiting gracefully..."; exit 0' TERM
           set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
           set -e
-
           echo "exit code: $ec"
-          # 124 = timeout -> anggap sukses (rotasi terjadwal)
           if [ "$ec" -eq 124 ]; then
             echo "Rotation timeout reached — treating as success."
             exit 0
           fi
-          # Kode lain = error -> fail job
           exit "$ec"
 
       - name: Upload artifacts (DB + logs)
