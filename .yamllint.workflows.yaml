@@ -1,0 +1,8 @@
+# .yamllint.workflows.yaml
+extends: default
+rules:
+  line-length:
+    max: 160
+    level: warning
+  truthy:
+    level: warning
