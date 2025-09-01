@@ -28,7 +28,7 @@ jobs:
 
       # 1) Lint repo utama, exclude workflows
       - name: Run yamllint (repo only)
-        run: yamllint -s -c .yamllint.yaml -- . ':!.github/workflows'
+        run: yamllint -s -c .yamllint.yaml .
 
       # 2) Lint khusus workflows dengan aturan berbeda
       - name: Run yamllint (workflows only, relaxed rules)
