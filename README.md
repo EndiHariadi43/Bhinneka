@@ -78,6 +78,10 @@ Every contribution goes to development, hosting, and community rewards.
 [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink?style=for-the-badge)](https://github.com/sponsors/EndiHariadi43)
 [![Patreon](https://img.shields.io/badge/Patreon-Support-orange?style=for-the-badge&logo=patreon)](https://patreon.com/EndiHariadi43)
 
+Or support via local platforms:  
+[![Saweria](https://img.shields.io/badge/Saweria-Donate-brightgreen?style=for-the-badge&logo=buymeacoffee&logoColor=white)](https://saweria.co/EndiHariadi43)  
+#[![Trakteer](https://img.shields.io/badge/Trakteer-Support-red?style=flat)](https://trakteer.id/yourTrakteerID)
+
 ---
 
 ## 📜 License
