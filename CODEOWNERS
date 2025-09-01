@@ -1,0 +1,10 @@
+# Default: semua file perlu review dari @EndiHariadi43
+*                                   @EndiHariadi43
+
+# Proteksi workflow & bot
+.github/workflows/bhinnekabot.yml   @EndiHariadi43
+bhinnekabot.py                      @EndiHariadi43
+
+# (Opsional) folder tertentu bisa punya owner tambahan
+docs/**                             @EndiHariadi43 @your-org/docs-team
+scripts/**                          @EndiHariadi43
