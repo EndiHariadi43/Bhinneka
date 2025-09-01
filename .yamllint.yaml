@@ -19,3 +19,5 @@ ignore: |
   dist/
   build/
   **/*.md
+  .github/workflows/*.yml
+  .github/workflows/*.yaml
