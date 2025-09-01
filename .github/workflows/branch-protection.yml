@@ -26,14 +26,13 @@ jobs:
       - name: Install yamllint
         run: pip install --upgrade pip yamllint
 
-      # 1) Lint repo, TAPI eksklusikan .github/workflows (meski config ignore sudah ada)
+      # 1) Lint repo utama, exclude workflows
       - name: Run yamllint (repo only)
         run: yamllint -s -c .yamllint.yaml -- . ':!.github/workflows'
 
-      # 2) Lint khusus folder workflows dengan aturan lebih longgar (inline)
-      #    -> kalau mau, bisa ganti -d ini dengan file .yamllint.workflows.yaml
+      # 2) Lint khusus workflows dengan aturan berbeda
       - name: Run yamllint (workflows only, relaxed rules)
-        run: yamllint -s -d "{extends: default, rules: {line-length: {max: 160, level: warning}, truthy: {level: warning}}}" .github/workflows
+        run: yamllint -s -c .yamllint.workflows.yaml .github/workflows
 
       - name: Branch policy marker
         run: echo "✅ branch protection check ok"
