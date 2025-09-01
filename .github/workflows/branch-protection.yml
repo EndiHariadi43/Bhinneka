@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  yamllint:                 # harus sama dengan status check yang Anda aktifkan
+  yamllint:                 # <-- nama job = nama status check yang Anda aktifkan
     name: yamllint
     runs-on: ubuntu-latest
     steps:
@@ -26,9 +26,11 @@ jobs:
       - name: Install yamllint
         run: pip install --upgrade pip yamllint
 
+      # Lint seluruh repo pakai aturan umum
       - name: Run yamllint (repo only)
         run: yamllint -s -c .yamllint.yaml .
 
+      # Lint khusus folder workflows pakai aturan terpisah
       - name: Run yamllint (workflows only)
         run: yamllint -s -c .yamllint.workflows.yaml .github/workflows
 
