@@ -93,11 +93,16 @@ jobs:
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
-          trap 'echo "⚠️  SIGTERM (likely rotation/cancel). Exiting gracefully..."; exit 0' TERM
+
+          # Tambahkan trap untuk menangkap SIGTERM dari GitHub Actions
+          trap 'echo "⚠️  Received SIGTERM — likely concurrency rotation or manual cancel. Exiting gracefully..."; exit 0' TERM
+
+          # Jalankan dengan timeout; jangan hentikan skrip saat exit!=0 agar bisa cek kode 124
           set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
           set -e
+
           echo "exit code: $ec"
           if [ "$ec" -eq 124 ]; then
             echo "Rotation timeout reached — treating as success."
