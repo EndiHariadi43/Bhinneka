@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  yamllint:
+  yamllint:             # ← nama job yang akan muncul sebagai required check
     name: yamllint
     runs-on: ubuntu-latest
     steps:
@@ -26,13 +26,18 @@ jobs:
       - name: Install yamllint
         run: pip install --upgrade pip yamllint
 
-      # 1) Lint repo utama, exclude workflows
+      # Lint seluruh repo, tapi abaikan workflows (diatur di .yamllint.yaml)
       - name: Run yamllint (repo only)
         run: yamllint -s -c .yamllint.yaml .
 
-      # 2) Lint khusus workflows dengan aturan berbeda
+      # Lint khusus folder workflows dengan aturan yang lebih longgar
       - name: Run yamllint (workflows only, relaxed rules)
-        run: yamllint -s -c .yamllint.workflows.yaml .github/workflows
+        run: |
+          if [ -d ".github/workflows" ]; then
+            yamllint -s -c .yamllint.workflows.yaml .github/workflows
+          else
+            echo "No .github/workflows directory, skipping…"
+          fi
 
       - name: Branch policy marker
         run: echo "✅ branch protection check ok"
