@@ -19,4 +19,4 @@ ignore: |
   dist/
   build/
   **/*.md
-  .github/workflows/*
+  .github/workflows/**        # ← workflows diabaikan pada lint “repo only”
