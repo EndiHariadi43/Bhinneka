@@ -1,3 +1,4 @@
+---
 name: Branch Policy Checks
 
 on:
@@ -11,10 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  yamllint:                 # ← nama check yang akan kamu set sebagai Required
+  yamllint:
     name: yamllint
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,24 +23,31 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       - name: Install yamllint
         run: |
           python -m pip install --upgrade pip
-          pip install "yamllint>=1.35.0"
+          pip install yamllint
 
-      # Lint seluruh repo (workflows diabaikan oleh .yamllint.yaml)
-      - name: Run yamllint (repo only)
-        run: yamllint -c .yamllint.yaml .
+      # Lint SEMUA YAML di repo KECUALI workflows
+      - name: Run yamllint (repo only, exclude workflows)
+        run: |
+          set -euo pipefail
+          files="$(git ls-files '*.yml' '*.yaml' | grep -v '^\.github/workflows/')" || true
+          if [ -n "$files" ]; then
+            echo "$files" | xargs yamllint -c .yamllint.yaml
+          else
+            echo "No non-workflow YAML files to lint."
+          fi
 
-      # Lint khusus folder workflows dengan rules longgar
+      # Lint KHUSUS workflows dengan aturan lebih longgar
       - name: Run yamllint (workflows only, relaxed rules)
         run: |
-          if [ -d ".github/workflows" ]; then
+          set -euo pipefail
+          if ls .github/workflows/*.yml .github/workflows/*.yaml >/dev/null 2>&1; then
             yamllint -c .yamllint.workflows.yaml .github/workflows
           else
-            echo "No .github/workflows directory, skipping…"
+            echo "No workflow YAML files found."
           fi
 
       - name: Branch policy marker
