@@ -1,7 +1,13 @@
 # CODEOWNERS
 # Semua file di repo ini wajib direview oleh owner sebelum merge ke main
 
-* @EndiHariadi43
+# Main owners
+*               @EndiHariadi43
+
+# Proteksi file sensitif
+/.github/workflows/bhinnekabot.yml      @EndiHariadi43
+/bhinnekabot.py                         @EndiHariadi43
+/requirements.txt                       @EndiHariadi43
 
 # --- contoh tambahan opsional ---
 # Folder dokumentasi
