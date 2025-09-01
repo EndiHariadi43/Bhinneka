@@ -1,6 +1,7 @@
 [![Actions Status](https://img.shields.io/github/actions/workflow/status/EndiHariadi43/Bhinneka/bhinnekabot.yml?branch=main)](https://github.com/EndiHariadi43/Bhinneka/actions/workflows/bhinnekabot.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-@BHEK_bot-26A5E4?logo=telegram&logoColor=white)](https://t.me/BHEK_bot)
+[![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink?style=for-the-badge)](https://github.com/sponsors/EndiHariadi43)
 
 # Bhinneka ($BHEK) — Unity in Diversity
 
