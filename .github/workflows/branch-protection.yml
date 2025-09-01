@@ -28,23 +28,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install yamllint
 
-      # Lint SEMUA YAML di repo KECUALI workflows
-      - name: Run yamllint (repo only, exclude workflows)
+      # Lint SEMUA YAML selain workflows dan FUNDING.yml (aturan ketat)
+      - name: Run yamllint (repo only, exclude workflows & FUNDING)
         run: |
           set -euo pipefail
-          files="$(git ls-files '*.yml' '*.yaml' | grep -v '^\.github/workflows/')" || true
-          if [ -n "$files" ]; then
-            echo "$files" | xargs yamllint -c .yamllint.yaml
-          else
-            echo "No non-workflow YAML files to lint."
-          fi
+          # Cari *.yml/*.yaml kecuali .github/workflows/* dan .github/FUNDING.yml
+          find . \
+            -type d -path './.git' -prune -o \
+            -type d -path './.github/workflows' -prune -o \
+            -type f \( -name '*.yml' -o -name '*.yaml' \) \
+            -not -path './.github/FUNDING.yml' \
+            -print0 | xargs -0 -r yamllint -s -c .yamllint.yaml
 
       # Lint KHUSUS workflows dengan aturan lebih longgar
       - name: Run yamllint (workflows only, relaxed rules)
         run: |
           set -euo pipefail
-          if ls .github/workflows/*.yml .github/workflows/*.yaml >/dev/null 2>&1; then
-            yamllint -c .yamllint.workflows.yaml .github/workflows
+          if [ -d ".github/workflows" ]; then
+            yamllint -s -c .yamllint.workflows.yaml .github/workflows
           else
             echo "No workflow YAML files found."
           fi
