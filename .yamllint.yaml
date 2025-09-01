@@ -1,4 +1,4 @@
-# .yamllint
+# Konfigurasi yamllint untuk SELURUH repo
 extends: default
 
 rules:
@@ -13,10 +13,11 @@ rules:
   trailing-spaces: enable
   document-start: disable
 
+# Folder/file yang diabaikan pada lint umum
 ignore: |
   .git/
   node_modules/
   dist/
   build/
   **/*.md
-  .github/workflows/*
+  .github/workflows/*      # <- workflows di-skip di lint umum, dilint terpisah dengan config override
