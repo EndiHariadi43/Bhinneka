@@ -83,7 +83,7 @@ jobs:
           PREMIUM_DAYS: ${{ secrets.PREMIUM_DAYS }}
           PYTHONUNBUFFERED: "1"
           OFFICIAL_ONLY: "1"
-          OFFICIAL_TON_ADDRESS: "UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5"
+          OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
