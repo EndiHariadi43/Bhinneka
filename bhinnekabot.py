@@ -17,10 +17,12 @@
 
 import asyncio
 import os
+import re
 import time
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Iterable, Optional
 
 import aiosqlite
 import httpx
@@ -38,8 +40,22 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bhinnekabot")
 
-def _to_bool(s: str | None) -> bool:
+def _to_bool(s: Optional[str]) -> bool:
     return str(s).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+def _parse_admins(s: Optional[str]) -> set[int]:
+    # ADMINS boleh "6993912434" atau "6993912434, 12345"
+    if not s:
+        return set()
+    parts = re.split(r"[,\s]+", s.strip())
+    out = set()
+    for p in parts:
+        if p.isdigit():
+            try:
+                out.add(int(p))
+            except Exception:
+                pass
+    return out
 
 # OFFICIAL MODE (opsional)
 OFFICIAL_ONLY = _to_bool(os.getenv("OFFICIAL_ONLY", "0"))
@@ -48,6 +64,9 @@ OFFICIAL_TON_ADDRESS = os.getenv(
     "UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5",
 )
 
+# ADMINS dari env (repo secrets)
+ADMINS: set[int] = _parse_admins(os.getenv("ADMINS", ""))
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TON_DEST = os.getenv("TON_DEST_ADDRESS")
 TON_API = os.getenv("TONCENTER_API", "https://toncenter.com/api/v2")
@@ -55,7 +74,7 @@ TON_API_KEY = os.getenv("TONCENTER_API_KEY", "")
 PREMIUM_PRICE_TON = float(os.getenv("PREMIUM_PRICE_TON", "1.0"))
 PREMIUM_DAYS = int(os.getenv("PREMIUM_DAYS", "30"))
 
-# Terapkan OFFICIAL_ONLY satu kali di awal
+# Terapkan OFFICIAL_ONLY sekali saat boot
 if OFFICIAL_ONLY:
     if TON_DEST and TON_DEST != OFFICIAL_TON_ADDRESS:
         logger.warning("OFFICIAL_ONLY=ON — overriding TON_DEST to OFFICIAL_TON_ADDRESS")
@@ -84,7 +103,9 @@ WELCOME_TEXT = (
     "BHEK — Unity in Diversity, powered by memes & community.\n\n"
     "🔹 /tasks — lihat tugas/quest harian\n"
     "🔹 /premium — posisi istimewa (dukungan TON)\n"
-    "🔹 /status — status akun kamu"
+    "🔹 /status — status akun kamu\n"
+    "🔹 /points — total poin kamu\n"
+    "🔹 /leaderboard — papan peringkat komunitas"
 )
 
 MAIN_KB = InlineKeyboardMarkup(
@@ -99,6 +120,8 @@ async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(
             """
+            PRAGMA journal_mode=WAL;
+
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 username TEXT,
@@ -119,20 +142,32 @@ async def init_db():
                 status TEXT DEFAULT 'PENDING'
             );
 
+            -- Quest harian (UTC)
             CREATE TABLE IF NOT EXISTS quests (
                 user_id INTEGER,
-                day TEXT,
-                claimed_at INTEGER,
+                day TEXT,               -- YYYYMMDD (UTC)
+                claimed_at INTEGER,     -- epoch seconds UTC
                 PRIMARY KEY (user_id, day)
+            );
+
+            -- Log poin (audit)
+            CREATE TABLE IF NOT EXISTS points_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                delta INTEGER,
+                reason TEXT,
+                by_admin INTEGER DEFAULT 0,
+                created_at INTEGER
             );
 
             CREATE INDEX IF NOT EXISTS idx_orders_code ON orders(code);
             CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
+            CREATE INDEX IF NOT EXISTS idx_points_user ON points_log(user_id);
             """
         )
         await db.commit()
 
-async def upsert_user(msg: Message, ref_by: int | None = None):
+async def upsert_user(msg: Message, ref_by: Optional[int] = None):
     uid = msg.from_user.id
     username = msg.from_user.username or ""
     fname = msg.from_user.first_name or ""
@@ -158,7 +193,7 @@ async def set_premium(user_id: int, days: int):
         await db.execute("UPDATE users SET premium_until=? WHERE user_id=?", (until, user_id))
         await db.commit()
 
-async def get_status(user_id: int):
+async def get_status(user_id: int) -> str:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("SELECT premium_until FROM users WHERE user_id=?", (user_id,))
         row = await cur.fetchone()
@@ -171,7 +206,7 @@ async def get_status(user_id: int):
             return f"🌟 Premium aktif hingga <b>{exp}</b>."
         return "🟢 Akun terdaftar. Premium: <b>Tidak aktif</b>."
 
-# ---------- Quest helpers ----------
+# ---------- Quest & Points helpers ----------
 def _today_key_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d")
 
@@ -193,18 +228,31 @@ async def record_claim(user_id: int) -> bool:
             await db.commit()
         return True
     except Exception:
-        return False
+        return False  # primary key conflict => sudah klaim
 
-async def add_points(user_id: int, amount: int):
+async def add_points(user_id: int, amount: int, reason: str = "", by_admin: bool = False):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE users SET points = COALESCE(points,0) + ? WHERE user_id=?", (amount, user_id))
+        await db.execute(
+            "INSERT INTO points_log(user_id, delta, reason, by_admin, created_at) VALUES (?,?,?,?,?)",
+            (user_id, amount, reason[:200], 1 if by_admin else 0, int(time.time())),
+        )
         await db.commit()
 
 async def get_points(user_id: int) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
         row = await cur.fetchone()
-        return row[0] if row and row[0] else 0
+        return int(row[0]) if row and row[0] else 0
+
+async def top_points(limit: int = 10) -> list[tuple[int, str, int]]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT user_id, COALESCE(username,''), COALESCE(points,0) "
+            "FROM users ORDER BY points DESC, user_id ASC LIMIT ?",
+            (limit,),
+        )
+        return await cur.fetchall()
 
 # ---------- TON Helpers ----------
 def build_ton_deeplink(address: str, amount_ton: float, comment: str) -> str:
@@ -234,7 +282,7 @@ async def ton_get_transactions(address: str, limit: int = 20):
         r.raise_for_status()
         return r.json()
 
-def extract_comment(tx: dict) -> str | None:
+def extract_comment(tx: dict) -> Optional[str]:
     try:
         msg = tx.get("in_msg") or {}
         return msg.get("message")
@@ -333,6 +381,21 @@ def premium_keyboard(link_app: str, link_tonhub: str, link_tgwallet: str, link_e
         ]
     )
 
+# ---------- Helpers ----------
+def _is_admin(uid: int) -> bool:
+    return uid in ADMINS
+
+async def _resolve_user_id(arg: str) -> Optional[int]:
+    # arg: "12345" atau "@username"
+    arg = arg.strip()
+    if arg.startswith("@"):
+        # Tidak ada API direct untuk resolve username → minta user /start supaya terdaftar,
+        # atau admin beri ID numerik. (Sederhana & aman)
+        return None
+    if arg.isdigit():
+        return int(arg)
+    return None
+
 # ---------- Handlers ----------
 @r.message(CommandStart())
 async def cmd_start(msg: Message):
@@ -378,7 +441,7 @@ async def cmd_claim(msg: Message):
             return
 
         if await record_claim(uid):
-            await add_points(uid, 10)
+            await add_points(uid, 10, reason="daily_claim", by_admin=False)
             pts = await get_points(uid)
             await msg.answer(
                 f"✅ Klaim dicatat (+10 poin). Total poin: <b>{pts}</b>",
@@ -408,6 +471,20 @@ async def cmd_queststatus(msg: Message):
 async def cmd_points(msg: Message):
     pts = await get_points(msg.from_user.id)
     await msg.answer(f"🏅 Total poin kamu: <b>{pts}</b>", reply_markup=MAIN_KB)
+
+@r.message(Command("leaderboard"))
+async def cmd_leaderboard(msg: Message):
+    rows = await top_points(limit=10)
+    if not rows:
+        await msg.answer("📉 Belum ada data poin.")
+        return
+    lines = ["🏆 <b>Leaderboard Top 10</b>"]
+    rank = 1
+    for uid, uname, pts in rows:
+        tag = f"@{uname}" if uname else f"<code>{uid}</code>"
+        lines.append(f"{rank}. {tag} — <b>{pts}</b> pts")
+        rank += 1
+    await msg.answer("\n".join(lines))
 
 @r.message(Command("premium"))
 async def cmd_premium(msg: Message):
@@ -476,26 +553,80 @@ async def cmd_help(msg: Message):
         "📖 <b>Command List</b>\n\n"
         "/start — Welcome & menu\n"
         "/tasks — Quest harian\n"
-        "/claim — Klaim quest\n"
-        "/queststatus — Lihat progres quest\n"
-        "/points — Lihat total poin\n"
+        "/claim — Klaim harian (+10 poin)\n"
+        "/queststatus — Progres klaim\n"
+        "/points — Total poin\n"
+        "/leaderboard — Papan peringkat Top 10\n"
         "/premium — Beli Premium via TON\n"
         "/status — Cek status Premium\n"
         "/ping — Tes respons bot\n"
-        "/help — Panduan semua command",
+        "/help — Panduan\n\n"
+        "<i>Admin</i>: /give &lt;user_id&gt; &lt;amount&gt; [reason]",
         reply_markup=MAIN_KB
     )
 
+# ---------- Admin commands ----------
+@r.message(Command("give"))
+async def cmd_give(msg: Message):
+    uid = msg.from_user.id
+    if not _is_admin(uid):
+        await msg.answer("⛔ Perintah khusus admin.")
+        return
+
+    # format: /give <user_id|@username> <amount> [reason...]
+    raw = (msg.text or "").strip()
+    parts = raw.split(maxsplit=3)
+    if len(parts) < 3:
+        await msg.answer("Usage: <code>/give &lt;user_id|@username&gt; &lt;amount&gt; [reason]</code>")
+        return
+
+    target_s = parts[1]
+    amount_s = parts[2]
+    reason = parts[3] if len(parts) >= 4 else "admin_grant"
+
+    target_id = await _resolve_user_id(target_s)
+    if not target_id:
+        await msg.answer("❗ Gunakan user_id numerik (minta user kirim /start agar tercatat).")
+        return
+
+    try:
+        amount = int(amount_s)
+    except Exception:
+        await msg.answer("Jumlah poin harus integer. Contoh: <code>/give 123456 50 reward</code>")
+        return
+
+    if amount == 0:
+        await msg.answer("Jumlah 0 tidak ada efek.")
+        return
+
+    # upsert user agar aman
+    class DummyFrom:
+        id = target_id
+        username = ""
+        first_name = "User"
+    class DummyMsg:
+        from_user = DummyFrom()
+    await upsert_user(DummyMsg())  # minimal supaya ada record users
+
+    await add_points(target_id, amount, reason=reason, by_admin=True)
+    new_pts = await get_points(target_id)
+    await msg.answer(f"✅ Berhasil menambahkan <b>{amount}</b> poin ke <code>{target_id}</code> (reason: {reason}).\nTotal sekarang: <b>{new_pts}</b>.")
+
+# Fallback untuk command tidak dikenal
 @r.message(F.text.regexp(r"^/"))
 async def unknown_command(msg: Message):
     await msg.answer("❓ Perintah tidak dikenali. Coba /help.", reply_markup=MAIN_KB)
 
+# ---------- Error logging ----------
 @dp.errors()
 async def on_error(event, exception):
     logger.exception("Unhandled error: %s | Update=%s", exception, getattr(event, "update", None))
 
+# ---------- Main ----------
 async def main():
     logger.info("Bot booting...")
+    if ADMINS:
+        logger.info("Loaded %d admin(s): %s", len(ADMINS), ", ".join(map(str, ADMINS)))
     await init_db()
     try:
         await bot.delete_webhook(drop_pending_updates=True)
@@ -506,9 +637,10 @@ async def main():
     await bot.set_my_commands([
         BotCommand(command="start", description="Welcome + menu"),
         BotCommand(command="tasks", description="Quest harian"),
-        BotCommand(command="claim", description="Klaim quest"),
-        BotCommand(command="queststatus", description="Lihat progres quest"),
-        BotCommand(command="points", description="Lihat total poin"),
+        BotCommand(command="claim", description="Klaim harian (+10 pts)"),
+        BotCommand(command="queststatus", description="Progres klaim"),
+        BotCommand(command="points", description="Total poin"),
+        BotCommand(command="leaderboard", description="Papan peringkat"),
         BotCommand(command="premium", description="Beli Premium via TON"),
         BotCommand(command="status", description="Cek status Premium"),
         BotCommand(command="ping", description="Tes respons bot"),
