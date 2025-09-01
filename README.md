@@ -80,7 +80,6 @@ Every contribution goes to development, hosting, and community rewards.
 
 Or support via local platforms:  
 [![Saweria](https://img.shields.io/badge/Saweria-Donate-brightgreen?style=for-the-badge&logo=buymeacoffee&logoColor=white)](https://saweria.co/EndiHariadi43)  
-#[![Trakteer](https://img.shields.io/badge/Trakteer-Support-red?style=flat)](https://trakteer.id/yourTrakteerID)
 
 ---
 
