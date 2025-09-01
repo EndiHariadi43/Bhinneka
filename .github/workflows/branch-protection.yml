@@ -11,10 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  yamllint:                # <- Nama job ini akan tampil sebagai required check: "yamllint"
+  yamllint:                 # harus sama dengan status check yang Anda aktifkan
     name: yamllint
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,13 +26,11 @@ jobs:
       - name: Install yamllint
         run: pip install --upgrade pip yamllint
 
-      # Lint seluruh repo memakai konfigurasi root (.yamllint.yaml)
-      - name: Run yamllint (repo)
-        run: yamllint -s .
+      - name: Run yamllint (repo only)
+        run: yamllint -s -c .yamllint.yaml .
 
-      # Lint khusus workflow memakai konfigurasi override agar folder ini TIDAK di-ignore
       - name: Run yamllint (workflows only)
-        run: yamllint -s -c .github/.yamllint.workflows.yaml .github/workflows
+        run: yamllint -s -c .yamllint.workflows.yaml .github/workflows
 
       - name: Branch policy marker
-        run: echo "✅ branch protection checks passed"
+        run: echo "✅ branch protection check ok"
