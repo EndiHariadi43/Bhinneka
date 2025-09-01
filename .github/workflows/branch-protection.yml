@@ -26,15 +26,15 @@ jobs:
       - name: Install yamllint
         run: pip install --upgrade pip yamllint
 
-      # Lint seluruh repo, tapi abaikan workflows (diatur di .yamllint.yaml)
+      # Lint seluruh repo (workflows diabaikan oleh .yamllint.yaml)
       - name: Run yamllint (repo only)
-        run: yamllint -s -c .yamllint.yaml .
+        run: yamllint -c .yamllint.yaml .
 
-      # Lint khusus folder workflows dengan aturan yang lebih longgar
+      # Lint khusus folder workflows dengan rules longgar
       - name: Run yamllint (workflows only, relaxed rules)
         run: |
           if [ -d ".github/workflows" ]; then
-            yamllint -s -c .yamllint.workflows.yaml .github/workflows
+            yamllint -c .yamllint.workflows.yaml .github/workflows
           else
             echo "No .github/workflows directory, skipping…"
           fi
