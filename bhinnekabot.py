@@ -38,55 +38,40 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bhinnekabot")
 
-# (BARU) mode resmi & alamat resmi
 def _to_bool(s: str | None) -> bool:
     return str(s).strip().lower() in {"1", "true", "yes", "y", "on"}
 
+# OFFICIAL MODE (opsional)
 OFFICIAL_ONLY = _to_bool(os.getenv("OFFICIAL_ONLY", "0"))
 OFFICIAL_TON_ADDRESS = os.getenv(
     "OFFICIAL_TON_ADDRESS",
-    "UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5",  # default resmi
+    "UQDwWm6EWph_L4suX5o7tC4KQZYr3rTN_rWiuP7gd8U3AMC5",
 )
 
-TON_DEST = os.getenv("TON_DEST_ADDRESS")
-
-if OFFICIAL_ONLY:
-    if TON_DEST and TON_DEST != OFFICIAL_TON_ADDRESS:
-        logger.warning("OFFICIAL_ONLY=ON — overriding TON_DEST to OFFICIAL_TON_ADDRESS")
-    TON_DEST = OFFICIAL_TON_ADDRESS
-    logger.info("Running in OFFICIAL mode. TON_DEST set to OFFICIAL_TON_ADDRESS.")
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-TON_DEST = os.getenv("TON_DEST_ADDRESS")  # alamat tujuan TON (boleh kosong jika OFFICIAL_ONLY=1)
+TON_DEST = os.getenv("TON_DEST_ADDRESS")
 TON_API = os.getenv("TONCENTER_API", "https://toncenter.com/api/v2")
 TON_API_KEY = os.getenv("TONCENTER_API_KEY", "")
 PREMIUM_PRICE_TON = float(os.getenv("PREMIUM_PRICE_TON", "1.0"))
 PREMIUM_DAYS = int(os.getenv("PREMIUM_DAYS", "30"))
 
-# Terapkan mode resmi (jika diaktifkan)
+# Terapkan OFFICIAL_ONLY satu kali di awal
 if OFFICIAL_ONLY:
-    # Kalau user set TON_DEST lain, paksa ke OFFICIAL_TON_ADDRESS
     if TON_DEST and TON_DEST != OFFICIAL_TON_ADDRESS:
         logger.warning("OFFICIAL_ONLY=ON — overriding TON_DEST to OFFICIAL_TON_ADDRESS")
     TON_DEST = OFFICIAL_TON_ADDRESS
     logger.info("Running in OFFICIAL mode. TON_DEST set to OFFICIAL_TON_ADDRESS.")
 
-# Validasi env yang wajib
+# Validasi env minimal
 if not BOT_TOKEN:
     raise RuntimeError("Set BOT_TOKEN di env/secrets")
-
 if not TON_DEST:
-    # Jika OFFICIAL_ONLY=0 dan TON_DEST kosong → stop, karena tidak tahu alamat tujuan
-    raise RuntimeError("TON_DEST_ADDRESS tidak terisi (atau set OFFICIAL_TON_ADDRESS jika OFFICIAL_ONLY=1)")
+    raise RuntimeError("TON_DEST_ADDRESS kosong (atau set OFFICIAL_TON_ADDRESS jika OFFICIAL_ONLY=1)")
 
 # ==== KOMUNITAS & GRUP ====
 COMMUNITY_LINK = "https://t.me/bhinneka_coin"
 X_LINK = "https://x.com/bhinneka_coin"
-# Bisa username berawalan @ atau ID numerik; jika kosong, fitur verifikasi akan di-skip
 COMMUNITY_CHAT_ID = os.getenv("COMMUNITY_CHAT_ID", "@bhinneka_coin")
-
-if not BOT_TOKEN or not TON_DEST:
-    raise RuntimeError("Set BOT_TOKEN & TON_DEST_ADDRESS di env/secrets")
 
 bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
@@ -102,13 +87,6 @@ WELCOME_TEXT = (
     "🔹 /status — status akun kamu"
 )
 
-TASKS = [
-    f'Join komunitas Telegram: <a href="{COMMUNITY_LINK}">@bhinneka_coin</a>',
-    "Follow X (Twitter): <i>opsional</i>",
-    "Retweet pinned post (X) & mention #BHEK",
-]
-
-# ---------- MAIN KEYBOARD ----------
 MAIN_KB = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="👥 Join Telegram", url=COMMUNITY_LINK)],
@@ -380,7 +358,6 @@ async def cmd_tasks(msg: Message):
 async def cmd_claim(msg: Message):
     uid = msg.from_user.id
     try:
-        # jika tidak dikonfigurasi, skip verifikasi join
         if COMMUNITY_CHAT_ID:
             member = await bot.get_chat_member(COMMUNITY_CHAT_ID, uid)
             status_ok = member.status in {
@@ -509,29 +486,23 @@ async def cmd_help(msg: Message):
         reply_markup=MAIN_KB
     )
 
-# Fallback untuk command yang tidak dikenal (opsional tapi membantu debug)
 @r.message(F.text.regexp(r"^/"))
 async def unknown_command(msg: Message):
     await msg.answer("❓ Perintah tidak dikenali. Coba /help.", reply_markup=MAIN_KB)
 
-# ---------- Error logging ----------
 @dp.errors()
 async def on_error(event, exception):
     logger.exception("Unhandled error: %s | Update=%s", exception, getattr(event, "update", None))
 
-# ---------- Main ----------
 async def main():
     logger.info("Bot booting...")
     await init_db()
-
-    # pastikan polling, tidak tertahan webhook lama
     try:
         await bot.delete_webhook(drop_pending_updates=True)
         logger.info("Webhook deleted (drop_pending_updates=True).")
     except Exception as e:
         logger.warning("delete_webhook failed: %s", e)
 
-    # set menu commands
     await bot.set_my_commands([
         BotCommand(command="start", description="Welcome + menu"),
         BotCommand(command="tasks", description="Quest harian"),
@@ -544,14 +515,10 @@ async def main():
         BotCommand(command="help", description="Panduan"),
     ])
 
-    # daftarkan router
     dp.include_router(r)
-
-    # jalankan watcher verifikasi premium
     asyncio.create_task(premium_watcher())
-
     logger.info("🚀 BhinnekaBot is polling for updates…")
-    await dp.start_polling(bot, allowed_updates=None)  # None = semua
+    await dp.start_polling(bot, allowed_updates=None)
 
 if __name__ == "__main__":
     try:
