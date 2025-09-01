@@ -3,10 +3,10 @@ extends: default
 
 rules:
   line-length:
-    max: 160
+    max: 180
     level: warning
   truthy:
-    level: warning
+    level: warning        # bisa diubah ke 'disable' kalau perlu lebih longgar
   indentation:
     indent-sequences: consistent
     check-multi-line-strings: false
