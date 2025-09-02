@@ -91,6 +91,7 @@ jobs:
           PREMIUM_DAYS:         ${{ secrets.PREMIUM_DAYS }}
           OFFICIAL_ONLY:        "1"
           OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
+          ADMINS:               ${{ secrets.ADMINS }}
           PYTHONUNBUFFERED:     "1"
         run: |
           set -euo pipefail
