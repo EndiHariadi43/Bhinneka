@@ -1,0 +1,94 @@
+name: Prune old workflow runs
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # jalan tiap hari 03:17 UTC (atur sesuai kebutuhan)
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: prune-runs
+  cancel-in-progress: true
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete failed/cancelled and keep last 20 good runs per workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const KEEP = 20;
+            const { owner, repo } = context.repo;
+
+            // Status yang akan dihapus SELALU, tanpa lihat urutan.
+            const PURGE_STATUSES = new Set(["failure", "cancelled"]);
+
+            // Ambil semua workflow di repo
+            const workflows = await github.paginate(
+              github.rest.actions.listRepoWorkflows,
+              { owner, repo, per_page: 100 }
+            );
+
+            for (const wf of workflows) {
+              core.startGroup(`Workflow: ${wf.name} (${wf.id})`);
+
+              // Ambil semua run (urut terbaru -> terlama)
+              const allRuns = await github.paginate(
+                github.rest.actions.listWorkflowRuns,
+                { owner, repo, workflow_id: wf.id, per_page: 100 }
+              );
+
+              core.info(`Total runs: ${allRuns.length}`);
+
+              // 1) Hapus semua run yang gagal / dibatalkan (kecuali sedang in_progress/queued)
+              const failedOrCancelled = allRuns.filter(r =>
+                PURGE_STATUSES.has((r.conclusion || "").toLowerCase())
+              );
+
+              let purged = 0;
+              for (const run of failedOrCancelled) {
+                try {
+                  await github.rest.actions.deleteWorkflowRun({
+                    owner, repo, run_id: run.id
+                  });
+                  purged++;
+                  core.info(`Purged (status=${run.conclusion}) run ${run.id}`);
+                } catch (err) {
+                  core.warning(`Failed to purge run ${run.id}: ${err.message}`);
+                }
+              }
+              core.info(`Purged failed/cancelled: ${purged}`);
+
+              // 2) Sisakan hanya 20 run "sehat" (tidak termasuk yang sudah dihapus / failure / cancelled)
+              //    Kita ambil ulang daftar run setelah purge supaya akurat.
+              const remainRuns = await github.paginate(
+                github.rest.actions.listWorkflowRuns,
+                { owner, repo, workflow_id: wf.id, per_page: 100 }
+              );
+
+              // Filter yang boleh dipertahankan untuk kuota KEEP
+              const healthy = remainRuns.filter(r =>
+                !PURGE_STATUSES.has((r.conclusion || "").toLowerCase())
+              );
+
+              // Simpan 20 terbaru, hapus sisanya
+              const toDelete = healthy.slice(KEEP);
+              core.info(`Healthy runs: ${healthy.length} | Deleting beyond ${KEEP}: ${toDelete.length}`);
+
+              for (const run of toDelete) {
+                try {
+                  await github.rest.actions.deleteWorkflowRun({
+                    owner, repo, run_id: run.id
+                  });
+                  core.info(`Deleted old run ${run.id}`);
+                } catch (err) {
+                  core.warning(`Failed to delete old run ${run.id}: ${err.message}`);
+                }
+              }
+
+              core.endGroup();
+            }
