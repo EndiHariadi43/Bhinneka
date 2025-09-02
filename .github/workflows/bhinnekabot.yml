@@ -4,12 +4,13 @@ on:
   push:
     branches: [ main ]
   schedule:
-    - cron: "0 */6 * * *"     # every 6 hours
+    - cron: "0 */6 * * *"   # setiap 6 jam
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Satu run aktif saja; run lama otomatis dibatalkan saat ada run baru
 concurrency:
   group: bhinnekabot
   cancel-in-progress: true
@@ -23,7 +24,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # NEW: Show run context (untuk debugging)
       - name: Show run context
         run: |
           echo "Repo        : $GITHUB_REPOSITORY"
@@ -32,7 +32,7 @@ jobs:
           echo "Actor       : $GITHUB_ACTOR"
           echo "Branch      : $GITHUB_REF_NAME"
           echo "Concurrency : group='bhinnekabot' (cancel-in-progress=true)"
-          echo "Note        : If a previous run is canceled, it's a NORMAL rotation."
+          echo "Note        : Jika ada run sebelumnya yang dibatalkan, itu ROTASI NORMAL."
 
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
@@ -60,14 +60,14 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           set -euo pipefail
-          curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getMe" | tee getme.json
+          curl -fSs "https://api.telegram.org/bot${BOT_TOKEN}/getMe" | tee getme.json
 
       - name: Ensure polling (delete webhook)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           set -euo pipefail
-          curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" | tee delwh.json
+          curl -fSs -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" | tee delwh.json
 
       - name: Ensure DB file exists (first run safety)
         run: |
@@ -81,7 +81,7 @@ jobs:
           PY
           ls -l bhinneka.db
 
-      - name: Run bot (with logs, 345m timeout)
+      - name: Run bot (with logs, 345m timeout; clear reasons)
         env:
           BOT_TOKEN:            ${{ secrets.BOT_TOKEN }}
           TON_DEST_ADDRESS:     ${{ secrets.TON_DEST_ADDRESS }}
@@ -96,20 +96,44 @@ jobs:
           set -euo pipefail
           echo "Starting BhinnekaBot..."
 
-          # Tambahkan trap untuk menangkap SIGTERM dari GitHub Actions
-          trap 'echo "⚠️  Received SIGTERM — likely concurrency rotation or manual cancel. Exiting gracefully..."; exit 0' TERM
+          # --- Handler agar alasan berhenti jelas di log & Step Summary ---
+          on_term() {
+            echo "⚠️  Received SIGTERM — kemungkinan besar rotasi concurrency atau cancel manual."
+            echo "reason: SIGTERM (cancel/rotation)" >> "$GITHUB_STEP_SUMMARY" || true
+            exit 0
+          }
+          on_int() {
+            echo "⚠️  Received SIGINT — menghentikan dengan rapi."
+            echo "reason: SIGINT" >> "$GITHUB_STEP_SUMMARY" || true
+            exit 0
+          }
+          on_exit() {
+            code="${1:-$?}"
+            echo "Final exit code: $code"
+          }
+          trap on_term TERM
+          trap on_int  INT
+          trap 'on_exit $?' EXIT
+          # ----------------------------------------------------------------
 
-          # Jalankan dengan timeout; jangan hentikan skrip saat exit!=0 agar bisa cek kode 124
+          # Jalankan dengan timeout; jangan gagal dulu supaya kita bisa baca exit code
           set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
           set -e
 
-          echo "exit code: $ec"
           if [ "$ec" -eq 124 ]; then
-            echo "Rotation timeout reached — treating as success."
+            echo "⏳ Rotation timeout (345m) tercapai — ini NORMAL. Bot akan di-rotate oleh schedule berikutnya."
+            echo "reason: timeout rotation (345m)" >> "$GITHUB_STEP_SUMMARY" || true
             exit 0
           fi
+
+          if [ "$ec" -eq 0 ]; then
+            echo "✅ Bot exited cleanly."
+            exit 0
+          fi
+
+          echo "❌ Bot exited with code $ec (bukan timeout/cancel)."
           exit "$ec"
 
       - name: Upload artifacts (DB + logs)
