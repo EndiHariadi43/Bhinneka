@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Endi Hariadi
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 # bhinnekabot.py
 # BhinnekaBot — Unity in Diversity 🤝
 
@@ -22,7 +23,7 @@ import time
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, Optional
+from typing import Optional
 
 import aiosqlite
 import httpx
@@ -32,7 +33,7 @@ from aiogram.types import (
     Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 )
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ChatMemberStatus, ParseMode
+from aiogram.enums import ChatMemberStatus, ParseMode, ChatType
 from dotenv import load_dotenv
 
 # ---------- ENV & LOGGING ----------
@@ -412,7 +413,7 @@ async def cmd_ping(msg: Message):
 async def cmd_tasks(msg: Message):
     lines = ["📋 <b>Quest Harian</b>"]
     lines.append(f'1) Join komunitas Telegram: <a href="{COMMUNITY_LINK}">@bhinneka_coin</a>')
-    lines.append('2) Follow X (Twitter): <a href="https://x.com/bhinneka_coin">@Bhinneka_coin</a>')
+    lines.append(f'2) Follow X (Twitter): <a href="{X_LINK}">@Bhinneka_coin</a>')
     lines.append('3) Retweet pinned post (X) & mention <b>#BHEK</b>')
     lines.append("\nKetik <code>/claim</code> setelah selesai.")
     await msg.answer("\n".join(lines), reply_markup=MAIN_KB)
@@ -549,7 +550,7 @@ async def cmd_status(msg: Message):
 
 @r.message(Command("help"))
 async def cmd_help(msg: Message):
-    await msg.answer(
+    base = (
         "📖 <b>Command List</b>\n\n"
         "/start — Welcome & menu\n"
         "/tasks — Quest harian\n"
@@ -560,17 +561,22 @@ async def cmd_help(msg: Message):
         "/premium — Beli Premium via TON\n"
         "/status — Cek status Premium\n"
         "/ping — Tes respons bot\n"
-        "/help — Panduan\n\n"
-        "<i>Admin</i>: /give &lt;user_id&gt; &lt;amount&gt; [reason]",
-        reply_markup=MAIN_KB
+        "/help — Panduan"
     )
+    if _is_admin(msg.from_user.id):
+        base += "\n\n<i>Admin</i>: /give <user_id> <amount> [reason], /broadcast <teks>"
+    await msg.answer(base, reply_markup=MAIN_KB)
 
 @r.message(Command("broadcast"))
 async def cmd_broadcast(msg: Message):
-    """Kirim pesan ke semua user terdaftar (khusus admin). 
+    """Kirim pesan ke semua user terdaftar (khusus admin).
     Pakai: /broadcast <teks>  atau balas sebuah pesan lalu ketik /broadcast"""
     if not _is_admin(msg.from_user.id):
         await msg.answer("⛔ Perintah khusus admin.")
+        return
+
+    if msg.chat.type != ChatType.PRIVATE:
+        await msg.answer("ℹ️ Jalankan /broadcast via DM ke bot ya.")
         return
 
     # Ambil teks dari argumen atau dari pesan yang di-reply
@@ -591,7 +597,8 @@ async def cmd_broadcast(msg: Message):
 
     # Ambil semua user terdaftar
     async with aiosqlite.connect(DB_PATH) as db:
-        rows = await db.execute_fetchall("SELECT user_id FROM users ORDER BY user_id ASC")
+        cur = await db.execute("SELECT user_id FROM users ORDER BY user_id ASC")
+        rows = await cur.fetchall()
 
     # Kirim dengan throttle ringan agar aman dari rate limit
     ok = fail = 0
@@ -605,7 +612,7 @@ async def cmd_broadcast(msg: Message):
             await asyncio.sleep(0.1)
 
     await msg.answer(f"📣 Broadcast selesai: terkirim <b>{ok}</b>, gagal <b>{fail}</b>.")
-    
+
 # ---------- Admin commands ----------
 @r.message(Command("give"))
 async def cmd_give(msg: Message):
@@ -641,17 +648,20 @@ async def cmd_give(msg: Message):
         return
 
     # upsert user agar aman
-    class DummyFrom:
+    class _DummyFrom:
         id = target_id
         username = ""
         first_name = "User"
-    class DummyMsg:
-        from_user = DummyFrom()
-    await upsert_user(DummyMsg())  # minimal supaya ada record users
+    class _DummyMsg:
+        from_user = _DummyFrom()
+    await upsert_user(_DummyMsg())  # minimal supaya ada record users
 
     await add_points(target_id, amount, reason=reason, by_admin=True)
     new_pts = await get_points(target_id)
-    await msg.answer(f"✅ Berhasil menambahkan <b>{amount}</b> poin ke <code>{target_id}</code> (reason: {reason}).\nTotal sekarang: <b>{new_pts}</b>.")
+    await msg.answer(
+        f"✅ Berhasil menambahkan <b>{amount}</b> poin ke <code>{target_id}</code> (reason: {reason}).\n"
+        f"Total sekarang: <b>{new_pts}</b>."
+    )
 
 # Fallback untuk command tidak dikenal
 @r.message(F.text.regexp(r"^/"))
@@ -686,6 +696,10 @@ async def main():
         BotCommand(command="status", description="Cek status Premium"),
         BotCommand(command="ping", description="Tes respons bot"),
         BotCommand(command="help", description="Panduan"),
+        # Catatan: dua command admin di bawah akan terlihat di list command semua user.
+        # Jika ingin disembunyikan dari non-admin, hapus dua baris ini dan hanya tampilkan via /help untuk admin.
+        BotCommand(command="broadcast", description="Kirim pesan ke semua user (admin only)"),
+        BotCommand(command="give", description="Tambah poin ke user (admin only)"),
     ])
 
     dp.include_router(r)
