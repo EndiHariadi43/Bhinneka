@@ -567,6 +567,14 @@ async def cmd_help(msg: Message):
         base += "\n\n<i>Admin</i>: /give <user_id> <amount> [reason], /broadcast <teks>"
     await msg.answer(base, reply_markup=MAIN_KB)
 
+@r.message(Command("whoami"))
+async def cmd_whoami(msg: Message):
+    await msg.answer(
+        f"🆔 <b>User ID:</b> <code>{msg.from_user.id}</code>\n"
+        f"👤 Username: @{msg.from_user.username or '-'}\n"
+        f"🔐 Admin: {'YA' if msg.from_user.id in ADMINS else 'TIDAK'}"
+    )
+
 @r.message(Command("broadcast"))
 async def cmd_broadcast(msg: Message):
     """Kirim pesan ke semua user terdaftar (khusus admin).
@@ -617,9 +625,9 @@ async def cmd_broadcast(msg: Message):
 @r.message(Command("give"))
 async def cmd_give(msg: Message):
     uid = msg.from_user.id
-    if not _is_admin(uid):
-        await msg.answer("⛔ Perintah khusus admin.")
-        return
+    if not _is_admin(msg.from_user.id):
+    await msg.answer("⛔ Perintah khusus admin. (Kirim /whoami lalu pastikan ID kamu ada di secret ADMINS)")
+    return
 
     # format: /give <user_id|@username> <amount> [reason...]
     raw = (msg.text or "").strip()
