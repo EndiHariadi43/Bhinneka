@@ -580,8 +580,8 @@ async def cmd_broadcast(msg: Message):
     """Kirim pesan ke semua user terdaftar (khusus admin).
     Pakai: /broadcast <teks>  atau balas sebuah pesan lalu ketik /broadcast"""
     if not _is_admin(msg.from_user.id):
-        await msg.answer("⛔ Perintah khusus admin.")
-        return
+        await msg.answer("⛔ Perintah khusus admin. (Kirim /whoami lalu pastikan ID kamu ada di secret ADMINS)")
+    return
 
     if msg.chat.type != ChatType.PRIVATE:
         await msg.answer("ℹ️ Jalankan /broadcast via DM ke bot ya.")
