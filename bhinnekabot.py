@@ -565,6 +565,47 @@ async def cmd_help(msg: Message):
         reply_markup=MAIN_KB
     )
 
+@r.message(Command("broadcast"))
+async def cmd_broadcast(msg: Message):
+    """Kirim pesan ke semua user terdaftar (khusus admin). 
+    Pakai: /broadcast <teks>  atau balas sebuah pesan lalu ketik /broadcast"""
+    if not _is_admin(msg.from_user.id):
+        await msg.answer("⛔ Perintah khusus admin.")
+        return
+
+    # Ambil teks dari argumen atau dari pesan yang di-reply
+    args_text = (msg.text or "").split(maxsplit=1)
+    text = ""
+    if len(args_text) >= 2:
+        text = args_text[1].strip()
+    elif msg.reply_to_message and (msg.reply_to_message.text or msg.reply_to_message.caption):
+        text = (msg.reply_to_message.text or msg.reply_to_message.caption).strip()
+
+    if not text:
+        await msg.answer(
+            "Usage:\n"
+            "<code>/broadcast pesan kamu...</code>\n"
+            "atau balas sebuah pesan lalu ketik <code>/broadcast</code>."
+        )
+        return
+
+    # Ambil semua user terdaftar
+    async with aiosqlite.connect(DB_PATH) as db:
+        rows = await db.execute_fetchall("SELECT user_id FROM users ORDER BY user_id ASC")
+
+    # Kirim dengan throttle ringan agar aman dari rate limit
+    ok = fail = 0
+    for (uid,) in rows:
+        try:
+            await bot.send_message(uid, text, disable_web_page_preview=True)
+            ok += 1
+            await asyncio.sleep(0.04)  # ~25 msg/detik
+        except Exception:
+            fail += 1
+            await asyncio.sleep(0.1)
+
+    await msg.answer(f"📣 Broadcast selesai: terkirim <b>{ok}</b>, gagal <b>{fail}</b>.")
+    
 # ---------- Admin commands ----------
 @r.message(Command("give"))
 async def cmd_give(msg: Message):
