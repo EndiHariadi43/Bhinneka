@@ -626,7 +626,7 @@ async def cmd_broadcast(msg: Message):
 async def cmd_give(msg: Message):
     uid = msg.from_user.id
     if not _is_admin(msg.from_user.id):
-    await msg.answer("⛔ Perintah khusus admin. (Kirim /whoami lalu pastikan ID kamu ada di secret ADMINS)")
+        await msg.answer("⛔ Perintah khusus admin. (Kirim /whoami lalu pastikan ID kamu ada di secret ADMINS)")
     return
 
     # format: /give <user_id|@username> <amount> [reason...]
