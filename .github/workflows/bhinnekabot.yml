@@ -9,8 +9,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
-# Satu run aktif saja; run lama otomatis dibatalkan saat ada run baru
 concurrency:
   group: bhinnekabot
   cancel-in-progress: false
@@ -31,8 +31,8 @@ jobs:
           echo "Attempt     : $GITHUB_RUN_ATTEMPT"
           echo "Actor       : $GITHUB_ACTOR"
           echo "Branch      : $GITHUB_REF_NAME"
-          echo "Concurrency : group='bhinnekabot' (cancel-in-progress=true)"
-          echo "Note        : Jika ada run sebelumnya yang dibatalkan, itu ROTASI NORMAL."
+          echo "Concurrency : group='bhinnekabot' (cancel-in-progress=false)"
+          echo "Note        : Rotasi dikendalikan guard + watcher, bukan auto-cancel."
 
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
@@ -91,28 +91,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Pastikan gh pakai token
+          echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
 
           has_other() {
-            runs=$(gh run list --workflow "${GITHUB_WORKFLOW}" --json databaseId,status,conclusion --limit 20)
+            runs=$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "${GITHUB_WORKFLOW}" \
+              --json databaseId,status \
+              --limit 20)
             other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
             [ "$other" -gt 0 ]
           }
 
-          # Jika sudah ada run aktif lain, keluar SUKSES sekarang
           if has_other; then
             echo "Another run is already active. Exiting gracefully (success)."
             exit 0
           fi
-
-          # Watcher background: kalau muncul run baru, stop bot lama dengan rapi
-          ( while true; do
-              if has_other; then
-                echo "Newer run detected. Stopping this run gracefully…"
-                pkill -SIGTERM -f "python -u bhinnekabot.py" || true
-                exit 0
-              fi
-              sleep 30
-            done ) &
             
       - name: Run bot (with logs, 345m timeout; clear reasons)
         env:
@@ -126,9 +121,29 @@ jobs:
           OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
           ADMINS:               ${{ secrets.ADMINS }}
           PYTHONUNBUFFERED:     "1"
+          GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}   # <-- penting utk watcher
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
+
+          # Auth gh (pakai GH_TOKEN)
+          echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
+
+          # --- watcher: hentikan run ini dgn rapi jika ada run baru yang aktif ---
+          has_other() {
+            runs=$(gh run list --workflow "${GITHUB_WORKFLOW}" --json databaseId,status --limit 20)
+            other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
+            [ "$other" -gt 0 ]
+          }
+          ( while true; do
+              if has_other; then
+                echo "Newer run detected. Stopping this run gracefully…"
+                pkill -SIGTERM -f "python -u bhinnekabot.py" || true
+                exit 0
+              fi
+              sleep 30
+            done ) &
+          # -----------------------------------------------------------------------
 
           # --- Handler agar alasan berhenti jelas di log & Step Summary ---
           on_term() {
