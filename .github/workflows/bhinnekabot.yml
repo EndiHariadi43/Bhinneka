@@ -13,7 +13,7 @@ permissions:
 # Satu run aktif saja; run lama otomatis dibatalkan saat ada run baru
 concurrency:
   group: bhinnekabot
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   run:
@@ -80,7 +80,40 @@ jobs:
           con.close()
           PY
           ls -l bhinneka.db
+      
+      - name: Install GitHub CLI + jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh jq
 
+      - name: Guard: exit if another run is active (success)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          has_other() {
+            runs=$(gh run list --workflow "${GITHUB_WORKFLOW}" --json databaseId,status,conclusion --limit 20)
+            other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
+            [ "$other" -gt 0 ]
+          }
+
+          # Jika sudah ada run aktif lain, keluar SUKSES sekarang
+          if has_other; then
+            echo "Another run is already active. Exiting gracefully (success)."
+            exit 0
+          fi
+
+          # Watcher background: kalau muncul run baru, stop bot lama dengan rapi
+          ( while true; do
+              if has_other; then
+                echo "Newer run detected. Stopping this run gracefully…"
+                pkill -SIGTERM -f "python -u bhinnekabot.py" || true
+                exit 0
+              fi
+              sleep 30
+            done ) &
+            
       - name: Run bot (with logs, 345m timeout; clear reasons)
         env:
           BOT_TOKEN:            ${{ secrets.BOT_TOKEN }}
