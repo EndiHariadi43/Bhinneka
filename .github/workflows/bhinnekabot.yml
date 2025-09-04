@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   schedule:
-    - cron: "0 */6 * * *"   # setiap 6 jam
+    - cron: "0 */6 * * *"      # setiap 6 jam
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: bhinnekabot
-  cancel-in-progress: false
+  cancel-in-progress: false     # rotasi di-handle guard + watcher
 
 jobs:
   run:
@@ -27,12 +27,13 @@ jobs:
       - name: Show run context
         run: |
           echo "Repo        : $GITHUB_REPOSITORY"
+          echo "Workflow    : $GITHUB_WORKFLOW"
           echo "Run ID      : $GITHUB_RUN_ID"
           echo "Attempt     : $GITHUB_RUN_ATTEMPT"
           echo "Actor       : $GITHUB_ACTOR"
           echo "Branch      : $GITHUB_REF_NAME"
           echo "Concurrency : group='bhinnekabot' (cancel-in-progress=false)"
-          echo "Note        : Rotasi dikendalikan guard + watcher, bukan auto-cancel."
+          echo "Note        : Rotasi via guard + watcher, bukan auto-cancel."
 
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
@@ -57,14 +58,14 @@ jobs:
 
       - name: Check Telegram token (getMe)
         env:
-          BOT_TOKEN: "${{ secrets.BOT_TOKEN }}"
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           set -euo pipefail
           curl -fSs "https://api.telegram.org/bot${BOT_TOKEN}/getMe" | tee getme.json
 
       - name: Ensure polling (delete webhook)
         env:
-          BOT_TOKEN: "${{ secrets.BOT_TOKEN }}"
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           set -euo pipefail
           curl -fSs -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true" | tee delwh.json
@@ -86,9 +87,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gh jq
 
+      # === GUARD: kalau sudah ada run aktif, keluar sukses (tanpa polling) ===
       - name: Guard: exit if another run is active (success)
         env:
-          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
@@ -105,48 +107,56 @@ jobs:
 
           if has_other; then
             echo "Another run is already active. Exiting gracefully (success)."
+            echo "diagnostic: other run active" >> "$GITHUB_STEP_SUMMARY" || true
+            # tetap buat log kosong agar ada artefak
+            touch bhinnekabot.log || true
             exit 0
           fi
 
+      # === RUN + WATCHER ===
       - name: Run bot (with logs, 345m timeout; clear reasons)
         env:
-          BOT_TOKEN:            "${{ secrets.BOT_TOKEN }}"
-          TON_DEST_ADDRESS:     "${{ secrets.TON_DEST_ADDRESS }}"
-          TONCENTER_API:        "${{ secrets.TONCENTER_API }}"
-          TONCENTER_API_KEY:    "${{ secrets.TONCENTER_API_KEY }}"
-          PREMIUM_PRICE_TON:    "${{ secrets.PREMIUM_PRICE_TON }}"
-          PREMIUM_DAYS:         "${{ secrets.PREMIUM_DAYS }}"
+          BOT_TOKEN:            ${{ secrets.BOT_TOKEN }}
+          TON_DEST_ADDRESS:     ${{ secrets.TON_DEST_ADDRESS }}
+          TONCENTER_API:        ${{ secrets.TONCENTER_API }}
+          TONCENTER_API_KEY:    ${{ secrets.TONCENTER_API_KEY }}
+          PREMIUM_PRICE_TON:    ${{ secrets.PREMIUM_PRICE_TON }}
+          PREMIUM_DAYS:         ${{ secrets.PREMIUM_DAYS }}
           OFFICIAL_ONLY:        "1"
-          OFFICIAL_TON_ADDRESS: "${{ secrets.OFFICIAL_TON_ADDRESS }}"
-          ADMINS:               "${{ secrets.ADMINS }}"
+          OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
+          ADMINS:               ${{ secrets.ADMINS }}
           PYTHONUNBUFFERED:     "1"
-          GH_TOKEN:             "${{ secrets.GITHUB_TOKEN }}"  # untuk watcher
+          GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
-
           echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
 
           has_other() {
-            runs=$(gh run list --workflow "${GITHUB_WORKFLOW}" --json databaseId,status --limit 20)
+            runs=$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "${GITHUB_WORKFLOW}" \
+              --json databaseId,status \
+              --limit 20)
             other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
             [ "$other" -gt 0 ]
           }
+
+          # watcher: jika muncul run baru, hentikan dengan rapi
           ( while true; do
               if has_other; then
                 echo "Newer run detected. Stopping this run gracefully…"
                 pkill -SIGTERM -f "python -u bhinnekabot.py" || true
+                echo "reason: watcher-newer-run" >> "$GITHUB_STEP_SUMMARY" || true
                 exit 0
               fi
               sleep 30
             done ) &
 
-          on_term() { echo "⚠️ SIGTERM (cancel/rotation)"; echo "reason: SIGTERM" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
-          on_int()  { echo "⚠️ SIGINT"; echo "reason: SIGINT" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
+          on_term() { echo "reason: SIGTERM" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
+          on_int()  { echo "reason: SIGINT"  >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
           on_exit() { code="${1:-$?}"; echo "Final exit code: $code"; }
-          trap on_term TERM
-          trap on_int  INT
-          trap 'on_exit $?' EXIT
+          trap on_term TERM; trap on_int INT; trap 'on_exit $?' EXIT
 
           set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
@@ -154,8 +164,8 @@ jobs:
           set -e
 
           if [ "$ec" -eq 124 ]; then
-            echo "⏳ Rotation timeout (345m) — NORMAL."
-            echo "reason: timeout rotation (345m)" >> "$GITHUB_STEP_SUMMARY" || true
+            echo "⏳ Rotation timeout (345m) — normal."
+            echo "reason: timeout-rotation" >> "$GITHUB_STEP_SUMMARY" || true
             exit 0
           fi
 
@@ -164,32 +174,10 @@ jobs:
             exit 0
           fi
 
-          echo "❌ Bot exited with code $ec (bukan timeout/cancel)."
+          echo "❌ Bot exited with code $ec (not timeout/cancel)."
           exit "$ec"
 
-      - name: Collect diagnostics (to Step Summary)
-        if: always()
-        env:
-          BOT_TOKEN: "${{ secrets.BOT_TOKEN }}"
-        run: |
-          set -euo pipefail
-          {
-            echo "## Diagnostics"
-            echo
-            echo "### Telegram getMe"
-            curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getMe" || true
-            echo
-            echo "### Telegram getWebhookInfo"
-            curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo" || true
-            echo
-            echo "### Bot log (tail 200 lines)"
-            if [ -f bhinnekabot.log ]; then
-              tail -n 200 bhinnekabot.log
-            else
-              echo "(no bhinnekabot.log)"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
+      # === Upload log & DB agar selalu ada jejak diagnosa ===
       - name: Upload artifacts (DB + logs)
         if: always()
         uses: actions/upload-artifact@v4
