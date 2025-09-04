@@ -581,7 +581,7 @@ async def cmd_broadcast(msg: Message):
     Pakai: /broadcast <teks>  atau balas sebuah pesan lalu ketik /broadcast"""
     if not _is_admin(msg.from_user.id):
         await msg.answer("⛔ Perintah khusus admin. (Kirim /whoami lalu pastikan ID kamu ada di secret ADMINS)")
-    return
+        return
 
     if msg.chat.type != ChatType.PRIVATE:
         await msg.answer("ℹ️ Jalankan /broadcast via DM ke bot ya.")
@@ -627,7 +627,7 @@ async def cmd_give(msg: Message):
     uid = msg.from_user.id
     if not _is_admin(msg.from_user.id):
         await msg.answer("⛔ Perintah khusus admin. (Kirim /whoami lalu pastikan ID kamu ada di secret ADMINS)")
-    return
+        return
 
     # format: /give <user_id|@username> <amount> [reason...]
     raw = (msg.text or "").strip()
