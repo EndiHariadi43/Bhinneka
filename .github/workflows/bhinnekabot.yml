@@ -11,7 +11,6 @@ permissions:
   contents: read
   actions: read
 
-# Kita atur rotasi manual (guard + watcher), bukan auto-cancel bawaan
 concurrency:
   group: bhinnekabot
   cancel-in-progress: false
@@ -68,7 +67,7 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           set -euo pipefail
-          curl -fSs -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook" | tee delwh.json
+          curl -fSs -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true" | tee delwh.json
 
       - name: Ensure DB file exists (first run safety)
         run: |
@@ -87,19 +86,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gh jq
 
-      # Jika sudah ada run aktif lain, step ini keluar SUKSES agar tidak tumpang tindih
       - name: Guard: exit if another run is active (success)
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Pastikan gh pakai token
           echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
 
           has_other() {
             runs=$(gh run list \
               --repo "$GITHUB_REPOSITORY" \
-              --workflow "$GITHUB_WORKFLOW" \
+              --workflow "${GITHUB_WORKFLOW}" \
               --json databaseId,status \
               --limit 20)
             other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
@@ -123,21 +120,17 @@ jobs:
           OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
           ADMINS:               ${{ secrets.ADMINS }}
           PYTHONUNBUFFERED:     "1"
-          GH_TOKEN:             ${{ github.token }}   # penting utk watcher
+          GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}   # untuk watcher
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
 
-          # Auth gh (pakai GH_TOKEN)
+          # Auth gh untuk watcher
           echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
 
-          # --- watcher: hentikan run ini dgn rapi jika ada run baru yang aktif ---
+          # Watcher: jika ada run baru aktif, matikan run ini dengan rapi
           has_other() {
-            runs=$(gh run list \
-              --repo "$GITHUB_REPOSITORY" \
-              --workflow "$GITHUB_WORKFLOW" \
-              --json databaseId,status \
-              --limit 20)
+            runs=$(gh run list --workflow "${GITHUB_WORKFLOW}" --json databaseId,status --limit 20)
             other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
             [ "$other" -gt 0 ]
           }
@@ -149,36 +142,23 @@ jobs:
               fi
               sleep 30
             done ) &
-          # -----------------------------------------------------------------------
 
-          # --- Handler agar alasan berhenti jelas di log & Step Summary ---
-          on_term() {
-            echo "⚠️  Received SIGTERM — kemungkinan besar rotasi concurrency atau cancel manual."
-            echo "reason: SIGTERM (cancel/rotation)" >> "$GITHUB_STEP_SUMMARY" || true
-            exit 0
-          }
-          on_int() {
-            echo "⚠️  Received SIGINT — menghentikan dengan rapi."
-            echo "reason: SIGINT" >> "$GITHUB_STEP_SUMMARY" || true
-            exit 0
-          }
-          on_exit() {
-            code="${1:-$?}"
-            echo "Final exit code: $code"
-          }
+          # Trap agar alasan berhenti jelas
+          on_term() { echo "⚠️ SIGTERM (cancel/rotation)"; echo "reason: SIGTERM" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
+          on_int()  { echo "⚠️ SIGINT"; echo "reason: SIGINT" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
+          on_exit() { code="${1:-$?}"; echo "Final exit code: $code"; }
           trap on_term TERM
           trap on_int  INT
           trap 'on_exit $?' EXIT
-          # ----------------------------------------------------------------
 
-          # Jalankan dengan timeout; jangan gagal dulu supaya kita bisa baca exit code
+          # Jalankan bot dengan timeout
           set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
           set -e
 
           if [ "$ec" -eq 124 ]; then
-            echo "⏳ Rotation timeout (345m) tercapai — ini NORMAL. Bot akan di-rotate oleh schedule berikutnya."
+            echo "⏳ Rotation timeout (345m) — NORMAL."
             echo "reason: timeout rotation (345m)" >> "$GITHUB_STEP_SUMMARY" || true
             exit 0
           fi
@@ -190,6 +170,30 @@ jobs:
 
           echo "❌ Bot exited with code $ec (bukan timeout/cancel)."
           exit "$ec"
+
+      # === DIAGNOSTICS & LOGS – SELALU JALAN ===
+      - name: Collect diagnostics (to Step Summary)
+        if: always()
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Diagnostics"
+            echo
+            echo "### Telegram getMe"
+            curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getMe" || true
+            echo
+            echo "### Telegram getWebhookInfo"
+            curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo" || true
+            echo
+            echo "### Bot log (tail 200 lines)"
+            if [ -f bhinnekabot.log ]; then
+              tail -n 200 bhinnekabot.log
+            else
+              echo "(no bhinnekabot.log)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts (DB + logs)
         if: always()
