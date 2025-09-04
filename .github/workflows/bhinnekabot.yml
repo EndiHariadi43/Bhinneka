@@ -11,6 +11,7 @@ permissions:
   contents: read
   actions: read
 
+# Kita atur rotasi manual (guard + watcher), bukan auto-cancel bawaan
 concurrency:
   group: bhinnekabot
   cancel-in-progress: false
@@ -80,15 +81,16 @@ jobs:
           con.close()
           PY
           ls -l bhinneka.db
-      
+
       - name: Install GitHub CLI + jq
         run: |
           sudo apt-get update
           sudo apt-get install -y gh jq
 
+      # Jika sudah ada run aktif lain, step ini keluar SUKSES agar tidak tumpang tindih
       - name: Guard: exit if another run is active (success)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # Pastikan gh pakai token
@@ -97,7 +99,7 @@ jobs:
           has_other() {
             runs=$(gh run list \
               --repo "$GITHUB_REPOSITORY" \
-              --workflow "${GITHUB_WORKFLOW}" \
+              --workflow "$GITHUB_WORKFLOW" \
               --json databaseId,status \
               --limit 20)
             other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
@@ -108,7 +110,7 @@ jobs:
             echo "Another run is already active. Exiting gracefully (success)."
             exit 0
           fi
-            
+
       - name: Run bot (with logs, 345m timeout; clear reasons)
         env:
           BOT_TOKEN:            ${{ secrets.BOT_TOKEN }}
@@ -121,7 +123,7 @@ jobs:
           OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
           ADMINS:               ${{ secrets.ADMINS }}
           PYTHONUNBUFFERED:     "1"
-          GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}   # <-- penting utk watcher
+          GH_TOKEN:             ${{ github.token }}   # penting utk watcher
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
@@ -131,7 +133,11 @@ jobs:
 
           # --- watcher: hentikan run ini dgn rapi jika ada run baru yang aktif ---
           has_other() {
-            runs=$(gh run list --workflow "${GITHUB_WORKFLOW}" --json databaseId,status --limit 20)
+            runs=$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "$GITHUB_WORKFLOW" \
+              --json databaseId,status \
+              --limit 20)
             other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
             [ "$other" -gt 0 ]
           }
