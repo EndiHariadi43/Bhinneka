@@ -57,14 +57,14 @@ jobs:
 
       - name: Check Telegram token (getMe)
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          BOT_TOKEN: "${{ secrets.BOT_TOKEN }}"
         run: |
           set -euo pipefail
           curl -fSs "https://api.telegram.org/bot${BOT_TOKEN}/getMe" | tee getme.json
 
       - name: Ensure polling (delete webhook)
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          BOT_TOKEN: "${{ secrets.BOT_TOKEN }}"
         run: |
           set -euo pipefail
           curl -fSs -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true" | tee delwh.json
@@ -88,7 +88,7 @@ jobs:
 
       - name: Guard: exit if another run is active (success)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
           set -euo pipefail
           echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
@@ -110,25 +110,23 @@ jobs:
 
       - name: Run bot (with logs, 345m timeout; clear reasons)
         env:
-          BOT_TOKEN:            ${{ secrets.BOT_TOKEN }}
-          TON_DEST_ADDRESS:     ${{ secrets.TON_DEST_ADDRESS }}
-          TONCENTER_API:        ${{ secrets.TONCENTER_API }}
-          TONCENTER_API_KEY:    ${{ secrets.TONCENTER_API_KEY }}
-          PREMIUM_PRICE_TON:    ${{ secrets.PREMIUM_PRICE_TON }}
-          PREMIUM_DAYS:         ${{ secrets.PREMIUM_DAYS }}
+          BOT_TOKEN:            "${{ secrets.BOT_TOKEN }}"
+          TON_DEST_ADDRESS:     "${{ secrets.TON_DEST_ADDRESS }}"
+          TONCENTER_API:        "${{ secrets.TONCENTER_API }}"
+          TONCENTER_API_KEY:    "${{ secrets.TONCENTER_API_KEY }}"
+          PREMIUM_PRICE_TON:    "${{ secrets.PREMIUM_PRICE_TON }}"
+          PREMIUM_DAYS:         "${{ secrets.PREMIUM_DAYS }}"
           OFFICIAL_ONLY:        "1"
-          OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
-          ADMINS:               ${{ secrets.ADMINS }}
+          OFFICIAL_TON_ADDRESS: "${{ secrets.OFFICIAL_TON_ADDRESS }}"
+          ADMINS:               "${{ secrets.ADMINS }}"
           PYTHONUNBUFFERED:     "1"
-          GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}   # untuk watcher
+          GH_TOKEN:             "${{ secrets.GITHUB_TOKEN }}"  # untuk watcher
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
 
-          # Auth gh untuk watcher
           echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
 
-          # Watcher: jika ada run baru aktif, matikan run ini dengan rapi
           has_other() {
             runs=$(gh run list --workflow "${GITHUB_WORKFLOW}" --json databaseId,status --limit 20)
             other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
@@ -143,7 +141,6 @@ jobs:
               sleep 30
             done ) &
 
-          # Trap agar alasan berhenti jelas
           on_term() { echo "⚠️ SIGTERM (cancel/rotation)"; echo "reason: SIGTERM" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
           on_int()  { echo "⚠️ SIGINT"; echo "reason: SIGINT" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
           on_exit() { code="${1:-$?}"; echo "Final exit code: $code"; }
@@ -151,7 +148,6 @@ jobs:
           trap on_int  INT
           trap 'on_exit $?' EXIT
 
-          # Jalankan bot dengan timeout
           set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
@@ -171,11 +167,10 @@ jobs:
           echo "❌ Bot exited with code $ec (bukan timeout/cancel)."
           exit "$ec"
 
-      # === DIAGNOSTICS & LOGS – SELALU JALAN ===
       - name: Collect diagnostics (to Step Summary)
         if: always()
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          BOT_TOKEN: "${{ secrets.BOT_TOKEN }}"
         run: |
           set -euo pipefail
           {
