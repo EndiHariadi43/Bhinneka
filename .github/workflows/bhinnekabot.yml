@@ -4,16 +4,16 @@ on:
   push:
     branches: [ main ]
   schedule:
-    - cron: "0 */6 * * *"      # setiap 6 jam
+    - cron: "0 */6 * * *"   # setiap 6 jam
   workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
 
+# Untuk debug: biarkan GitHub auto-cancel run lama saat ada run baru
 concurrency:
   group: bhinnekabot
-  cancel-in-progress: false     # rotasi di-handle guard + watcher
+  cancel-in-progress: true
 
 jobs:
   run:
@@ -32,8 +32,7 @@ jobs:
           echo "Attempt     : $GITHUB_RUN_ATTEMPT"
           echo "Actor       : $GITHUB_ACTOR"
           echo "Branch      : $GITHUB_REF_NAME"
-          echo "Concurrency : group='bhinnekabot' (cancel-in-progress=false)"
-          echo "Note        : Rotasi via guard + watcher, bukan auto-cancel."
+          echo "Concurrency : cancel-in-progress=true (rotasi otomatis oleh GitHub)"
 
       - name: Restore DB artifact (if exists)
         uses: actions/download-artifact@v4
@@ -82,38 +81,6 @@ jobs:
           PY
           ls -l bhinneka.db
 
-      - name: Install GitHub CLI + jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gh jq
-
-      # === GUARD: kalau sudah ada run aktif, keluar sukses (tanpa polling) ===
-      - name: Guard: exit if another run is active (success)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
-
-          has_other() {
-            runs=$(gh run list \
-              --repo "$GITHUB_REPOSITORY" \
-              --workflow "${GITHUB_WORKFLOW}" \
-              --json databaseId,status \
-              --limit 20)
-            other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
-            [ "$other" -gt 0 ]
-          }
-
-          if has_other; then
-            echo "Another run is already active. Exiting gracefully (success)."
-            echo "diagnostic: other run active" >> "$GITHUB_STEP_SUMMARY" || true
-            # tetap buat log kosong agar ada artefak
-            touch bhinnekabot.log || true
-            exit 0
-          fi
-
-      # === RUN + WATCHER ===
       - name: Run bot (with logs, 345m timeout; clear reasons)
         env:
           BOT_TOKEN:            ${{ secrets.BOT_TOKEN }}
@@ -126,42 +93,25 @@ jobs:
           OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
           ADMINS:               ${{ secrets.ADMINS }}
           PYTHONUNBUFFERED:     "1"
-          GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           echo "Starting BhinnekaBot..."
-          echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
 
-          has_other() {
-            runs=$(gh run list \
-              --repo "$GITHUB_REPOSITORY" \
-              --workflow "${GITHUB_WORKFLOW}" \
-              --json databaseId,status \
-              --limit 20)
-            other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
-            [ "$other" -gt 0 ]
-          }
-
-          # watcher: jika muncul run baru, hentikan dengan rapi
-          ( while true; do
-              if has_other; then
-                echo "Newer run detected. Stopping this run gracefully…"
-                pkill -SIGTERM -f "python -u bhinnekabot.py" || true
-                echo "reason: watcher-newer-run" >> "$GITHUB_STEP_SUMMARY" || true
-                exit 0
-              fi
-              sleep 30
-            done ) &
-
-          on_term() { echo "reason: SIGTERM" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
-          on_int()  { echo "reason: SIGINT"  >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
+          on_term() { echo "reason: SIGTERM (rotation/cancel)" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
+          on_int()  { echo "reason: SIGINT" >> "$GITHUB_STEP_SUMMARY" || true; exit 0; }
           on_exit() { code="${1:-$?}"; echo "Final exit code: $code"; }
-          trap on_term TERM; trap on_int INT; trap 'on_exit $?' EXIT
+          trap on_term TERM
+          trap on_int  INT
+          trap 'on_exit $?' EXIT
 
+          # Jalankan dengan timeout; tampung log
           set +e
           timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
           ec=$?
           set -e
+
+          # Tulis ringkasan 100 baris terakhir log ke Step Summary
+          { echo "### Tail of bhinnekabot.log (last 100 lines)"; echo; tail -n 100 bhinnekabot.log 2>/dev/null || true; } >> "$GITHUB_STEP_SUMMARY" || true
 
           if [ "$ec" -eq 124 ]; then
             echo "⏳ Rotation timeout (345m) — normal."
@@ -177,7 +127,6 @@ jobs:
           echo "❌ Bot exited with code $ec (not timeout/cancel)."
           exit "$ec"
 
-      # === Upload log & DB agar selalu ada jejak diagnosa ===
       - name: Upload artifacts (DB + logs)
         if: always()
         uses: actions/upload-artifact@v4
