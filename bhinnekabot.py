@@ -566,9 +566,9 @@ async def cmd_help(msg: Message):
     if _is_admin(msg.from_user.id):
         base += (
             "\n\n<i>Admin</i>:"
-            "\n/broadcast <teks> — kirim pesan ke semua user"
+            "\n<code>/broadcast &lt;teks&gt;</code> — kirim pesan ke semua user"
             "\n   contoh: <code>/broadcast Halo semua ✨</code>"
-            "\n/give <user_id> <amount> [reason] — tambah poin ke user"
+            "\n<code>/give &lt;user_id&gt; &lt;amount&gt; [reason]</code> — tambah poin ke user"
             "\n   contoh: <code>/give 6993912434 100 reward_test</code>"
         )
     await msg.answer(base, reply_markup=MAIN_KB)
