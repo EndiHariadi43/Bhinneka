@@ -4,8 +4,13 @@ on:
   push:
     branches: [ main ]
   schedule:
-    - cron: "0 */6 * * *"      # setiap 6 jam
+    - cron: "0 */6 * * *"      # setiap 6 jam (UTC)
   workflow_dispatch:
+    inputs:
+      runtime_minutes:
+        description: "Durasi jalan (menit)"
+        required: false
+        default: "330"         # ~5 jam 30 menit
 
 permissions:
   contents: read
@@ -14,6 +19,10 @@ permissions:
 concurrency:
   group: bhinnekabot
   cancel-in-progress: false     # rotasi di-handle guard + watcher
+
+env:
+  PYTHONUNBUFFERED: "1"
+  RUNTIME_MIN_DEFAULT: "330"
 
 jobs:
   run:
@@ -33,14 +42,6 @@ jobs:
           echo "Actor       : $GITHUB_ACTOR"
           echo "Branch      : $GITHUB_REF_NAME"
           echo "Concurrency : group='bhinnekabot' (cancel-in-progress=false)"
-          echo "Note        : Rotasi via guard + watcher, bukan auto-cancel."
-
-      - name: Restore DB artifact (if exists)
-        uses: actions/download-artifact@v4
-        with:
-          name: bhinneka-db
-          path: .
-        continue-on-error: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -52,6 +53,52 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Install GitHub CLI + jq + unzip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh jq unzip
+
+      # === TRUE RESTORE DB dari run sukses terakhir (bukan dari run saat ini) ===
+      - name: Restore DB from last successful run artifact (if exists)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
+          # Ambil run sukses terakhir dari workflow yang sama, KECUALI run ini sendiri
+          LAST_OK=$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "$GITHUB_WORKFLOW" \
+              --status success \
+              --json databaseId,headSha \
+              --limit 10 | \
+            jq -r "[.[] | select(.databaseId != ${GITHUB_RUN_ID})][0].databaseId")
+          if [ "$LAST_OK" = "null" ] || [ -z "$LAST_OK" ]; then
+            echo "No previous successful run. Skipping DB restore."
+            exit 0
+          fi
+          echo "Downloading DB artifact from run #$LAST_OK ..."
+          if gh run download "$LAST_OK" --name bhinneka-db --dir . ; then
+            echo "Artifact downloaded."
+            ls -l || true
+          else
+            echo "No 'bhinneka-db' artifact found in run #$LAST_OK."
+          fi
+
+      - name: Ensure DB file exists (first run safety)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sqlite3, os
+          path = 'bhinneka.db'
+          con = sqlite3.connect(path)
+          con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
+          con.commit()
+          con.close()
+          print("DB ready:", os.path.abspath(path))
+          PY
+          ls -l bhinneka.db
 
       - name: Show files (debug)
         run: ls -al
@@ -70,23 +117,6 @@ jobs:
           set -euo pipefail
           curl -fSs -X POST "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true" | tee delwh.json
 
-      - name: Ensure DB file exists (first run safety)
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import sqlite3
-          con = sqlite3.connect('bhinneka.db')
-          con.execute('CREATE TABLE IF NOT EXISTS _init(id INTEGER)')
-          con.commit()
-          con.close()
-          PY
-          ls -l bhinneka.db
-
-      - name: Install GitHub CLI + jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gh jq
-
       # === GUARD: kalau sudah ada run aktif, keluar sukses (tanpa polling) ===
       - name: Guard: exit if another run is active (success)
         env:
@@ -94,7 +124,6 @@ jobs:
         run: |
           set -euo pipefail
           echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
-
           has_other() {
             runs=$(gh run list \
               --repo "$GITHUB_REPOSITORY" \
@@ -104,17 +133,16 @@ jobs:
             other=$(echo "$runs" | jq "[.[] | select(.status==\"in_progress\" and .databaseId != ${GITHUB_RUN_ID})] | length")
             [ "$other" -gt 0 ]
           }
-
           if has_other; then
             echo "Another run is already active. Exiting gracefully (success)."
             echo "diagnostic: other run active" >> "$GITHUB_STEP_SUMMARY" || true
-            # buat log kosong agar tetap ada artefak
-            touch bhinnekabot.log || true
+            # tetap siapkan log kosong agar ada artifact
+            : > bhinnekabot.log
             exit 0
           fi
 
-      # === RUN + WATCHER ===
-      - name: Run bot (with logs, 345m timeout; clear reasons)
+      # === RUN + WATCHER + SELF-HEALING LOOP ===
+      - name: Run bot (rotating watchdog; auto-restart until deadline)
         env:
           BOT_TOKEN:            ${{ secrets.BOT_TOKEN }}
           TON_DEST_ADDRESS:     ${{ secrets.TON_DEST_ADDRESS }}
@@ -125,11 +153,10 @@ jobs:
           OFFICIAL_ONLY:        "1"
           OFFICIAL_TON_ADDRESS: ${{ secrets.OFFICIAL_TON_ADDRESS }}
           ADMINS:               ${{ secrets.ADMINS }}
-          PYTHONUNBUFFERED:     "1"
           GH_TOKEN:             ${{ secrets.GITHUB_TOKEN }}
+          RUNTIME_MIN_INPUT:    ${{ inputs.runtime_minutes }}
         run: |
           set -euo pipefail
-          echo "Starting BhinnekaBot..."
           echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
 
           has_other() {
@@ -158,27 +185,38 @@ jobs:
           on_exit() { code="${1:-$?}"; echo "Final exit code: $code"; }
           trap on_term TERM; trap on_int INT; trap 'on_exit $?' EXIT
 
-          # Tampilkan log ke Actions secara live lewat 'tee'
-          set +e
-          timeout 345m bash -o pipefail -c 'python -u bhinnekabot.py 2>&1 | tee bhinnekabot.log'
-          ec=$?
-          set -e
+          # DEADLINE rotasi
+          RUNTIME_MIN="${RUNTIME_MIN_INPUT:-$RUNTIME_MIN_DEFAULT}"
+          START_TS=$(date +%s)
+          END_TS=$(( START_TS + RUNTIME_MIN * 60 ))
+          echo "Rotation window: ${RUNTIME_MIN} minutes"
 
-          if [ "$ec" -eq 124 ]; then
-            echo "⏳ Rotation timeout (345m) — normal."
-            echo "reason: timeout-rotation" >> "$GITHUB_STEP_SUMMARY" || true
-            exit 0
-          fi
+          # SELF-HEALING LOOP: restart bila crash, sampai deadline
+          : > bhinnekabot.log
+          while [ "$(date +%s)" -lt "$END_TS" ]; do
+            echo "Launching bot at $(date -u)..."
+            set +e
+            python -u bhinnekabot.py 2>&1 | tee -a bhinnekabot.log
+            EC=${PIPESTATUS[0]}
+            set -e
+            NOW=$(date +%s)
+            if [ "$EC" -eq 0 ]; then
+              echo "Bot exited cleanly. Restarting in 10s (until deadline) ..."
+              sleep 10
+            elif [ "$EC" -eq 130 ] || [ "$EC" -eq 143 ]; then
+              echo "Received INT/TERM. Exit loop."
+              break
+            else
+              echo "Bot crashed (exit=$EC). Backoff 10s & retry (until deadline) ..."
+              sleep 10
+            fi
+            # jangan lewatkan batas GA
+            if [ "$NOW" -ge "$END_TS" ]; then
+              echo "Reached rotation deadline."
+              break
+            fi
+          done
 
-          if [ "$ec" -eq 0 ]; then
-            echo "✅ Bot exited cleanly."
-            exit 0
-          fi
-
-          echo "❌ Bot exited with code $ec (not timeout/cancel)."
-          exit "$ec"
-
-      # === CETAK CUMLAH LOG KE ACTIONS (tanpa download artifact) ===
       - name: Show first 20 lines of log
         if: always()
         run: |
@@ -191,7 +229,7 @@ jobs:
           echo "----- LAST 200 LINES -----"
           if [ -f bhinnekabot.log ]; then tail -n 200 bhinnekabot.log; else echo "(no bhinnekabot.log)"; fi
 
-      # === Upload log & DB (tetap diupload untuk arsip) ===
+      # === Upload log & DB agar run berikutnya bisa restore lewat gh API ===
       - name: Upload artifacts (DB + logs)
         if: always()
         uses: actions/upload-artifact@v4
