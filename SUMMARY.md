@@ -30,7 +30,7 @@ Before contributing, please review our [Contributing Guide](./CONTRIBUTING.md):
 
 ### 🔒 Security
 Our [Security Policy](./SECURITY.md) defines how to report vulnerabilities:  
-- Email reports to **endi.linux.mint@gmail.com**  
+- Email reports to **59972539+EndiHariadi43@users.noreply.github.com**  
 - We respond within 72h (max 7×24h)  
 - Safe Harbor: good faith research is protected  
 - Out of scope: DoS via spam, physical access, outdated deps without exploit  
