@@ -11,7 +11,7 @@ Older branches may not receive security updates unless explicitly stated.
 ---
 
 ## 🐞 Reporting a Vulnerability
-Please report privately to **endi.linux.mint@gmail.com**.  
+Please report privately to **59972539+EndiHariadi43@users.noreply.github.com**.  
 Include the following details in your report:
 - A short description of the issue and its potential impact  
 - Steps to reproduce  
